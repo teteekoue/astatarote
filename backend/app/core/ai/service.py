@@ -213,7 +213,7 @@ class AIService:
             raise ValueError(f"Unknown API Provider: {provider}")
 
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=90.0) as client:
                 response = client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
