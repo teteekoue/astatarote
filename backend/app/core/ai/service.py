@@ -297,13 +297,12 @@ class AIService:
 
         try:
             response_text = cls._call_provider_api(provider, api_key, messages, json_mode=True)
-            # Remove potential markdown wrappers if the AI didn't listen
+            # Bulletproof JSON extraction
             cleaned_text = response_text.strip()
-            if cleaned_text.startswith("```json"):
-                cleaned_text = cleaned_text[7:]
-            if cleaned_text.endswith("```"):
-                cleaned_text = cleaned_text[:-3]
-            cleaned_text = cleaned_text.strip()
+            first_brace = cleaned_text.find("{")
+            last_brace = cleaned_text.rfind("}")
+            if first_brace != -1 and last_brace != -1:
+                cleaned_text = cleaned_text[first_brace:last_brace+1]
             
             level_data = json.loads(cleaned_text)
             return level_data
