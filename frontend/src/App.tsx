@@ -19,6 +19,7 @@ export interface UserType {
   id: number;
   username: string;
   email: string;
+  created_at: string;
   preferences: UserPreferencesType;
   stats: {
     total_time: number;

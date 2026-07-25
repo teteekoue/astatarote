@@ -1,0 +1,71 @@
+name: Build and Release Debian Packages
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers when pushing tag like v1.0.0
+    branches:
+      - main # Allows manual testing on pushing to main branch
+
+permissions:
+  contents: write # Allows uploading packages to releases
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-size: 20
+
+      - name: Build React Frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
+
+      - name: Build Debian Packages (amd64 and i386)
+        run: |
+          chmod +x build_deb.sh
+          # Build 64-bit AMD64 package
+          ./build_deb.sh amd64
+          # Build 32-bit I386 package
+          ./build_deb.sh i386
+
+      - name: Verify Build Outputs
+        run: |
+          ls -la astatarote_*.deb
+
+      - name: Create GitHub Release and Upload Binaries
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            astatarote_1.0.0_amd64.deb
+            astatarote_1.0.0_i386.deb
+          body: |
+            ## Astatarote - Release v${{ github.ref_name }}
+            
+            Cette version contient les installateurs Debian `.deb` prêts à l'emploi d'**Astatarote** pour les architectures 32-bit (i386) et 64-bit (amd64).
+            
+            ### 📦 Téléchargements :
+            - **64-bit (amd64)** : `astatarote_1.0.0_amd64.deb`
+            - **32-bit (i386)** : `astatarote_1.0.0_i386.deb`
+            
+            ### 🚀 Instructions d'installation :
+            Pour installer Astatarote sur votre distribution Debian, Ubuntu, Mint ou Kali Linux, ouvrez un terminal et exécutez :
+            
+            ```bash
+            sudo dpkg -i astatarote_1.0.0_amd64.deb
+            sudo apt-get install -f # Répare les dépendances système manquantes si nécessaire
+            ```
+            
+            ### 🎮 Lancer l'application :
+            Tapez simplement `astatarote` dans votre console ou lancez l'application depuis votre menu des applications système !
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

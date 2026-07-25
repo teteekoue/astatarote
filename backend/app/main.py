@@ -46,14 +46,21 @@ app.include_router(games_router, prefix="/api")
 app.include_router(terminal_ws_router)
 app.include_router(chat_ws_router)
 
-@app.get("/")
-def read_root():
-    return {
-        "status": "online",
-        "project": "Astatarote",
-        "description": "Plateforme d'apprentissage Linux et Cybersécurité",
-        "docs_url": "/docs"
-    }
+# Mount built frontend assets (for self-contained production distribution)
+from fastapi.staticfiles import StaticFiles
+frontend_dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+if os.path.exists(frontend_dist_dir):
+    app.mount("/", StaticFiles(directory=frontend_dist_dir, html=True), name="frontend")
+else:
+    # Optional fallback for local dev if dist is not compiled yet
+    @app.get("/")
+    def read_root():
+        return {
+            "status": "online",
+            "project": "Astatarote",
+            "description": "Plateforme d'apprentissage Linux et Cybersécurité (Mode Développement API)",
+            "docs_url": "/docs"
+        }
 
 if __name__ == "__main__":
     import uvicorn

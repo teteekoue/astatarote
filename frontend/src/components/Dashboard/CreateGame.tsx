@@ -30,9 +30,7 @@ export default function CreateGame({ user, onGameCreated, onCancel }: CreateGame
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.strip) {
-      if (!name.trim()) return;
-    }
+    if (!name.trim()) return;
     
     setGenerating(true);
     setGeneratingStep(0);
