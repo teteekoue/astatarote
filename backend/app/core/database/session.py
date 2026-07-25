@@ -3,7 +3,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:////home/user/astarote/astarote.db")
+home_dir = os.path.expanduser("~")
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{home_dir}/.astatarote.db")
 
 # Ensure the parent directory of the database exists
 db_dir = os.path.dirname(DATABASE_URL.replace("sqlite:///", ""))

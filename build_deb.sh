@@ -44,6 +44,7 @@ if lsof -i :$PORT &>/dev/null; then
     echo "[!] Le port $PORT est déjà utilisé. Lancement du navigateur..."
 else
     echo "[*] Démarrage du serveur backend d'Astatarote sur le port $PORT..."
+    cd /usr/share/astatarote
     PYTHONPATH=/usr/share/astatarote /usr/share/astatarote/backend/.venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port $PORT > /tmp/astatarote_backend.log 2>&1 &
     # Give the backend 3 seconds to spin up
     sleep 3
