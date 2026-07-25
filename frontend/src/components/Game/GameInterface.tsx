@@ -52,7 +52,7 @@ export default function GameInterface({ gameId, user, onBackToDashboard }: GameI
         const data = await res.json();
         setLevels(data);
         
-        # Default to the current game level
+        // Default to the current game level
         const inProgress = data.find((l: LevelType) => l.status === 'available' || l.status === 'in_progress');
         if (inProgress) {
           setSelectedLevelIdx(inProgress.level_index);
