@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Terminal, Settings as SettingsIcon, Award, PlusCircle, Gamepad2, User as UserIcon, LogOut, ShieldAlert } from 'lucide-react';
+import { Terminal, Settings as SettingsIcon, Award, PlusCircle, Gamepad2, User as UserIcon, LogOut, ShieldAlert, Cpu } from 'lucide-react';
 import Dashboard from './components/Dashboard/Dashboard';
 import CreateGame from './components/Dashboard/CreateGame';
 import GameInterface from './components/Game/GameInterface';
@@ -35,7 +35,6 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch or initialize user profile on startup
   const fetchUser = async () => {
     try {
       setLoading(true);
@@ -44,7 +43,6 @@ export default function App() {
         const data = await res.json();
         setUser(data);
       } else {
-        // Simple error logging
         setError("Impossible de charger le profil utilisateur.");
       }
     } catch (err) {
@@ -63,97 +61,133 @@ export default function App() {
     setUser(updatedUser);
   };
 
-  // Sidebar or header navigation rendering
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#030712] relative overflow-hidden">
+        {/* Futuristic glowing bg circles */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#10B981]/5 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#8B5CF6]/5 rounded-full blur-3xl"></div>
+        
+        <div className="z-10 flex flex-col items-center space-y-4">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#10B981]"></div>
+            <ShieldAlert className="h-6 w-6 text-[#10B981] absolute inset-0 m-auto animate-pulse" />
+          </div>
+          <h2 className="text-lg font-bold font-mono tracking-widest text-[#10B981]">ASTATAROTE SYSTEMS</h2>
+          <p className="font-mono text-xs text-gray-500 uppercase tracking-widest">Initialisation du Noyau Adaptatif...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If in game interface, hide sidebar for maximum focus on terminal (SaaS IDE layout)
+  if (activePage === 'game' && selectedGameId) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#030712]">
+        <GameInterface 
+          gameId={selectedGameId}
+          user={user!}
+          onBackToDashboard={() => {
+            fetchUser();
+            setActivePage('dashboard');
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#070A13]">
-      {/* Header bar */}
-      <header className="border-b border-gray-800 bg-[#0B0F19] px-6 py-4 flex items-center justify-between z-20">
-        <div 
-          className="flex items-center space-x-3 cursor-pointer select-none"
-          onClick={() => { setActivePage('dashboard'); setSelectedGameId(null); }}
-        >
-          <div className="bg-[#10B981]/10 p-2 rounded-lg border border-[#10B981]/30">
-            <ShieldAlert className="h-6 w-6 text-[#10B981] animate-pulse" />
+    <div className="min-h-screen flex bg-[#030712] text-gray-100 overflow-hidden relative font-sans">
+      {/* Dynamic atmospheric ambient lights */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-b from-[#10B981]/5 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-to-t from-purple-500/5 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+
+      {/* Modern Vertical Left Sidebar (VS Code / SaaS Style) */}
+      <aside className="w-64 bg-[#090D1A]/85 backdrop-blur-xl border-r border-gray-850 flex flex-col justify-between shrink-0 z-20">
+        
+        {/* Brand Header */}
+        <div className="p-6 border-b border-gray-850/60 flex items-center space-x-3">
+          <div className="bg-[#10B981]/15 p-2 rounded-xl border border-[#10B981]/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+            <ShieldAlert className="h-5 w-5 text-[#10B981]" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-[#10B981] to-emerald-400 font-mono">
+            <h1 className="text-md font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-[#10B981] to-emerald-400 font-mono">
               ASTATAROTE
             </h1>
-            <p className="text-[10px] text-gray-500 font-mono tracking-widest uppercase">Ethical Adaptive Cyber-Lab</p>
+            <p className="text-[9px] text-gray-500 font-mono tracking-widest uppercase">LABS DE CYBERSECURITÉ</p>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="hidden md:flex items-center space-x-1">
+        {/* Sidebar Nav Items */}
+        <nav className="flex-1 px-4 py-6 space-y-2">
           <button
             onClick={() => { setActivePage('dashboard'); setSelectedGameId(null); }}
-            className={`px-4 py-2 rounded-lg flex items-center space-x-2 font-mono text-sm transition-all duration-200 ${
-              activePage === 'dashboard' || activePage === 'create-game' || activePage === 'game'
-                ? 'bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/30'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/40'
+            className={`w-full px-4 py-3 rounded-xl flex items-center space-x-3.5 font-mono text-sm transition-all duration-200 group ${
+              activePage === 'dashboard' || activePage === 'create-game'
+                ? 'bg-gradient-to-r from-[#10B981]/15 to-emerald-500/5 text-[#10B981] border border-[#10B981]/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900/40 border border-transparent'
             }`}
           >
-            <Gamepad2 className="h-4 w-4" />
-            <span>Mes Jeux</span>
+            <Gamepad2 className="h-4.5 w-4.5 group-hover:scale-105 transition-transform" />
+            <span className="font-semibold">Mes Laboratoires</span>
           </button>
+
           <button
             onClick={() => { setActivePage('profile'); setSelectedGameId(null); }}
-            className={`px-4 py-2 rounded-lg flex items-center space-x-2 font-mono text-sm transition-all duration-200 ${
+            className={`w-full px-4 py-3 rounded-xl flex items-center space-x-3.5 font-mono text-sm transition-all duration-200 group ${
               activePage === 'profile'
-                ? 'bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/30'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/40'
+                ? 'bg-gradient-to-r from-[#10B981]/15 to-emerald-500/5 text-[#10B981] border border-[#10B981]/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900/40 border border-transparent'
             }`}
           >
-            <Award className="h-4 w-4" />
-            <span>Profil & Badges</span>
+            <Award className="h-4.5 w-4.5 group-hover:scale-105 transition-transform" />
+            <span className="font-semibold">Profil & Badges</span>
           </button>
+
           <button
             onClick={() => { setActivePage('settings'); setSelectedGameId(null); }}
-            className={`px-4 py-2 rounded-lg flex items-center space-x-2 font-mono text-sm transition-all duration-200 ${
+            className={`w-full px-4 py-3 rounded-xl flex items-center space-x-3.5 font-mono text-sm transition-all duration-200 group ${
               activePage === 'settings'
-                ? 'bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/30'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/40'
+                ? 'bg-gradient-to-r from-[#10B981]/15 to-emerald-500/5 text-[#10B981] border border-[#10B981]/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900/40 border border-transparent'
             }`}
           >
-            <SettingsIcon className="h-4 w-4" />
-            <span>Paramètres</span>
+            <SettingsIcon className="h-4.5 w-4.5 group-hover:scale-105 transition-transform" />
+            <span className="font-semibold">Paramètres</span>
           </button>
         </nav>
 
-        {/* User status */}
-        <div className="flex items-center space-x-3">
-          {user && (
-            <div className="text-right hidden sm:block">
-              <p className="text-xs text-gray-500 font-mono">Grade : <span className="text-amber-500 font-semibold">{user.stats.rank || "Novice"}</span></p>
-              <p className="text-sm font-semibold text-[#10B981] font-mono">{user.stats.points || 0} pts</p>
+        {/* Profile Footer Panel */}
+        {user && (
+          <div className="p-4 border-t border-gray-850/60 bg-gray-950/30 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-[#10B981]/10 to-indigo-500/10 border border-gray-850 flex items-center justify-center">
+                <UserIcon className="h-4 w-4 text-[#10B981]" />
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-bold text-gray-200 font-mono truncate max-w-[110px]">{user.username}</p>
+                <p className="text-[10px] text-amber-500 font-mono tracking-wider">{user.stats.rank}</p>
+              </div>
             </div>
-          )}
-          <div 
-            onClick={() => setActivePage('profile')}
-            className="h-9 w-9 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center cursor-pointer hover:border-[#10B981] transition-all"
-          >
-            <UserIcon className="h-5 w-5 text-[#10B981]" />
+            <div className="text-right">
+              <span className="text-xs font-black font-mono text-[#10B981]">{user.stats.points} pt</span>
+            </div>
           </div>
-        </div>
-      </header>
+        )}
+      </aside>
 
-      {/* Main Content Area */}
+      {/* Main Page Area */}
       <main className="flex-1 flex flex-col min-h-0 relative">
-        {loading ? (
-          <div className="flex-1 flex flex-col items-center justify-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#10B981]"></div>
-            <p className="font-mono text-gray-400 text-sm">Initialisation d'Astatarote...</p>
-          </div>
-        ) : error ? (
-          <div className="flex-1 flex flex-col items-center justify-center space-y-4 p-6">
-            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-xl max-w-md text-center">
-              <p className="font-mono text-red-400 font-bold mb-2">Une erreur est survenue</p>
-              <p className="text-sm text-gray-300">{error}</p>
+        {error ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-6">
+            <div className="bg-red-950/10 border border-red-500/30 p-6 rounded-2xl max-w-md text-center backdrop-blur-md shadow-2xl">
+              <p className="font-mono text-red-400 font-bold mb-2">ERREUR DE CHARGEMENT</p>
+              <p className="text-sm text-gray-400 mb-4">{error}</p>
               <button 
                 onClick={fetchUser}
-                className="mt-4 px-4 py-2 bg-red-500 text-white font-mono text-sm rounded-lg hover:bg-red-600 transition"
+                className="w-full py-2 bg-red-500 hover:bg-red-600 text-white font-mono text-sm rounded-xl transition shadow-lg"
               >
-                Réessayer
+                Tenter une Reconnexion
               </button>
             </div>
           </div>
@@ -174,20 +208,10 @@ export default function App() {
                 user={user!}
                 onGameCreated={(gameId) => {
                   setSelectedGameId(gameId);
-                  fetchUser(); // Refresh stats/profile
+                  fetchUser();
                   setActivePage('game');
                 }}
                 onCancel={() => setActivePage('dashboard')}
-              />
-            )}
-            {activePage === 'game' && selectedGameId && (
-              <GameInterface 
-                gameId={selectedGameId}
-                user={user!}
-                onBackToDashboard={() => {
-                  fetchUser(); // Refresh stats/profile
-                  setActivePage('dashboard');
-                }}
               />
             )}
             {activePage === 'settings' && (

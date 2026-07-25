@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Save, Shield, Settings as SettingsIcon, Sliders, CheckCircle2, Key } from 'lucide-react';
-import { UserType, UserPreferencesType } from '../../App';
+import { UserType } from '../../App';
 
 interface SettingsProps {
   user: UserType;
@@ -57,60 +57,59 @@ export default function Settings({ user, onPreferencesUpdated }: SettingsProps) 
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 max-w-3xl mx-auto w-full space-y-6">
-      <div className="flex items-center space-x-3 border-b border-gray-800 pb-4">
-        <div className="p-2 bg-[#10B981]/10 rounded-lg border border-[#10B981]/20">
+    <div className="flex-1 overflow-y-auto p-8 max-w-4xl mx-auto w-full space-y-8 select-none">
+      <div className="flex items-center space-x-3 border-b border-gray-800/80 pb-4">
+        <div className="p-2 bg-[#10B981]/10 rounded-xl border border-[#10B981]/20">
           <SettingsIcon className="h-5 w-5 text-[#10B981]" />
         </div>
         <div>
-          <h2 className="text-lg font-bold text-white font-mono">Paramètres Généraux</h2>
+          <h2 className="text-xl font-bold text-white font-mono tracking-wide">Paramètres Généraux</h2>
           <p className="text-xs text-gray-400">Configurez votre environnement d'apprentissage et vos clés d'API d'Intelligence Artificielle</p>
         </div>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Save feedback notifications */}
         {saveSuccess && (
-          <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 text-[#10B981] font-mono text-xs rounded-xl flex items-center space-x-2">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-[#10B981] font-mono text-xs rounded-2xl flex items-center space-x-2.5 shadow-md">
+            <CheckCircle2 className="h-4.5 w-4.5 shrink-0" />
             <span>Vos préférences ont été sauvegardées avec succès !</span>
           </div>
         )}
         {error && (
-          <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-400 font-mono text-xs rounded-xl">
+          <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 font-mono text-xs rounded-2xl">
             <span>{error}</span>
           </div>
         )}
 
         {/* AI API Configuration */}
-        <div className="bg-[#111827] border border-gray-800 p-5 rounded-2xl space-y-4">
-          <h3 className="font-mono text-sm font-bold text-white flex items-center space-x-2">
-            <Key className="h-4 w-4 text-[#10B981]" />
+        <div className="bg-[#090D1A]/90 border border-gray-850 p-6 rounded-2xl space-y-4 shadow-xl">
+          <h3 className="font-mono text-sm font-bold text-white flex items-center space-x-2.5">
+            <Key className="h-4.5 w-4.5 text-[#10B981]" />
             <span>Moteur d'Intelligence Artificielle</span>
           </h3>
-          <p className="text-xs text-gray-400 font-mono leading-relaxed">
+          <p className="text-xs text-gray-400 font-mono leading-relaxed bg-[#040712]/30 p-4 rounded-xl border border-gray-850/50">
             Astatarote s'interface avec plusieurs fournisseurs d'IA LLM pour générer vos scénarios à la volée. 
-            Sélectionnez <strong>fallback</strong> si vous n'avez pas de clé API (les défis seront générés par notre simulateur de règles intégré, 100% opérationnel !).
+            Sélectionnez <strong>simulateur intégré</strong> si vous n'avez pas de clé API (les défis seront générés par notre simulateur de règles intégré, 100% opérationnel !).
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <label className="text-xs font-mono text-gray-400">Fournisseur d'IA</label>
               <select
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}
-                className="w-full bg-gray-950 border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-2.5 rounded-xl text-sm font-mono text-gray-300"
+                className="w-full bg-[#040712] border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-3 rounded-xl text-sm font-mono text-gray-300"
               >
                 <option value="fallback">Simulateur Intégré (Local / Fallback)</option>
-                <option value="groq">Groq AI (Llama 3)</option>
                 <option value="nvidia">NVIDIA AI Foundation</option>
+                <option value="groq">Groq AI (Llama 3)</option>
                 <option value="fireworks">Fireworks AI</option>
                 <option value="cohere">Cohere API</option>
                 <option value="together">Together AI</option>
               </select>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <label className="text-xs font-mono text-gray-400">Clé API Secrète</label>
               <input
                 type="password"
@@ -118,38 +117,38 @@ export default function Settings({ user, onPreferencesUpdated }: SettingsProps) 
                 disabled={provider === 'fallback'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                className="w-full bg-gray-950 border border-gray-800 disabled:opacity-50 focus:border-[#10B981]/60 focus:outline-none p-2.5 rounded-xl text-sm font-mono"
+                className="w-full bg-[#040712] border border-gray-800 disabled:opacity-40 focus:border-[#10B981]/60 focus:outline-none p-3 rounded-xl text-sm font-mono"
               />
             </div>
           </div>
         </div>
 
         {/* Display & Terminal configs */}
-        <div className="bg-[#111827] border border-gray-800 p-5 rounded-2xl space-y-4">
-          <h3 className="font-mono text-sm font-bold text-white flex items-center space-x-2">
-            <Sliders className="h-4 w-4 text-[#10B981]" />
+        <div className="bg-[#090D1A]/90 border border-gray-850 p-6 rounded-2xl space-y-4 shadow-xl">
+          <h3 className="font-mono text-sm font-bold text-white flex items-center space-x-2.5">
+            <Sliders className="h-4.5 w-4.5 text-[#10B981]" />
             <span>Affichage & Terminaux</span>
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <label className="text-xs font-mono text-gray-400">Thème de l'interface</label>
               <select
                 value={theme}
                 onChange={(e) => setTheme(e.target.value)}
-                className="w-full bg-gray-950 border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-2.5 rounded-xl text-sm font-mono text-gray-300"
+                className="w-full bg-[#040712] border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-3 rounded-xl text-sm font-mono text-gray-300"
               >
                 <option value="dark">Cyber Dark (Sombre)</option>
                 <option value="light">Solarized Light (Clair)</option>
               </select>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <label className="text-xs font-mono text-gray-400">Taille de police du terminal</label>
               <select
                 value={fontSize}
                 onChange={(e) => setFontSize(parseInt(e.target.value))}
-                className="w-full bg-gray-950 border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-2.5 rounded-xl text-sm font-mono text-gray-300"
+                className="w-full bg-[#040712] border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-3 rounded-xl text-sm font-mono text-gray-300"
               >
                 <option value={12}>12px (Compact)</option>
                 <option value={14}>14px (Standard)</option>
@@ -158,12 +157,12 @@ export default function Settings({ user, onPreferencesUpdated }: SettingsProps) 
               </select>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <label className="text-xs font-mono text-gray-400">Type de terminal par défaut</label>
               <select
                 value={terminalType}
                 onChange={(e) => setTerminalType(e.target.value)}
-                className="w-full bg-gray-950 border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-2.5 rounded-xl text-sm font-mono text-gray-300"
+                className="w-full bg-[#040712] border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-3 rounded-xl text-sm font-mono text-gray-300"
               >
                 <option value="simulation">Simulé par l'IA (Recommandé)</option>
                 <option value="docker">Sandbox Docker isolée</option>
@@ -177,7 +176,7 @@ export default function Settings({ user, onPreferencesUpdated }: SettingsProps) 
         <button
           type="submit"
           disabled={saving}
-          className="w-full md:w-auto px-6 py-2.5 bg-[#10B981] hover:bg-emerald-600 disabled:opacity-50 text-black font-bold font-mono rounded-xl text-xs flex items-center justify-center space-x-2 transition shadow-md"
+          className="px-6 py-3 bg-[#10B981] hover:bg-emerald-500 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] disabled:opacity-50 text-black font-bold font-mono rounded-xl text-xs flex items-center justify-center space-x-2 transition-all duration-300 shadow-md"
         >
           <Save className="h-4 w-4" />
           <span>Enregistrer les préférences</span>
