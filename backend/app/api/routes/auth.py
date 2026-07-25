@@ -3,12 +3,12 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
-
 from backend.app.core.database.session import get_db
 from backend.app.models.models import User
 from backend.app.schemas.schemas import UserCreate, UserLogin, Token, UserResponse
+import hashlib
+import secrets
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -16,14 +16,17 @@ SECRET_KEY = "asta-secure-super-secret-key-for-jwt-tokens-2026"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    salt = "asta-salt-2026"
+    h = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
+    return h
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    salt = "asta-salt-2026"
+    h = hashlib.sha256((plain_password + salt).encode('utf-8')).hexdigest()
+    return h == hashed_password
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
