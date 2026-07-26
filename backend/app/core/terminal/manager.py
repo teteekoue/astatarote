@@ -137,6 +137,158 @@ class TerminalSimulator:
         if command_line in forbidden or any(f in command_line for f in ["rm -rf /", "mkfs", "dd"]):
             return "Sécurité : Commande interdite détectée par le gardien Astatarote !", cwd, fs, processes
 
+        # --- HIGHLY INSTRUCTED CYBERSECURITY / WIFI TOOLS SIMULATION ---
+        if cmd == "airmon-ng":
+            if not args:
+                return (
+                    "PHY\tInterface\tDriver\t\tChipset\n"
+                    "phy0\twlan0\t\tath9k\t\tQualcomm Atheros QCA9565 (monitor mode disabled)"
+                , cwd, fs, processes)
+            
+            sub = args[0]
+            if sub == "start":
+                if len(args) < 2:
+                    return "Utilisation : airmon-ng start <interface>", cwd, fs, processes
+                interface = args[1]
+                if interface == "wlan0":
+                    # Add virtual monitor interface
+                    fs["/sys/class/net/wlan0mon"] = {"is_dir": True, "perms": "755"}
+                    return (
+                        "[*] Enabling monitor mode on wlan0...\n"
+                        "[+] Monitor mode enabled on interface wlan0mon (mac80211 monitor mode vif enabled for [phy0]wlan0 on [phy0]wlan0mon)"
+                    , cwd, fs, processes)
+                else:
+                    return f"Interface {interface} introuvable.", cwd, fs, processes
+            elif sub == "stop":
+                if len(args) < 2:
+                    return "Utilisation : airmon-ng stop <interface>", cwd, fs, processes
+                interface = args[1]
+                if interface == "wlan0mon":
+                    if "/sys/class/net/wlan0mon" in fs:
+                        del fs["/sys/class/net/wlan0mon"]
+                    return "[*] Disabling monitor mode. Interface wlan0mon stopped.", cwd, fs, processes
+                return f"Interface {interface} non active en mode moniteur.", cwd, fs, processes
+            else:
+                return "Commande airmon-ng non reconnue.", cwd, fs, processes
+
+        elif cmd == "airodump-ng":
+            if not args:
+                return "Utilisation : airodump-ng <interface_moniteur>", cwd, fs, processes
+            interface = args[0]
+            if "/sys/class/net/wlan0mon" not in fs and interface != "wlan0mon":
+                return f"Interface {interface} n'est pas en mode moniteur ! Activez-le d'abord avec airmon-ng.", cwd, fs, processes
+            
+            # Print beautiful wireless networks table dump
+            dump_output = (
+                " CH  6 ][ Elapsed: 4 s ][ 2026-07-25 19:30 ][ WPA handshake: 00:14:6C:7E:40:80\n\n"
+                " BSSID              PWR  Beacons    #Data, #/s  CH   MB   ENC CIPHER  AUTH ESSID\n"
+                " 00:14:6C:7E:40:80  -42       84       412    8   6   54 . WPA2 CCMP   PSK  AstaWifi_Secure\n"
+                " 00:1A:2B:3C:4D:5E  -71       20         0    0  11   54   WPA2 CCMP   PSK  NeighborNet_Guest\n"
+                " 00:0F:B5:44:88:99  -85        5         0    0   1   54   WEP  WEP          FreeBox_32A\n\n"
+                " BSSID              STATION            PWR   Rate    Lost    Frames  Notes\n"
+                " 00:14:6C:7E:40:80  00:0F:B5:12:34:56  -31   0 - 1      0        14  Handshake captured !"
+            )
+            # Create a handshake cap file in root so user can run aircrack-ng on it!
+            fs["/home/user/handshake.cap"] = {
+                "content": "WPA2 HANDSHAKE CAPTURED FROM BSSID 00:14:6C:7E:40:80",
+                "perms": "644",
+                "owner": "user",
+                "is_dir": False
+            }
+            return dump_output, cwd, fs, processes
+
+        elif cmd == "aircrack-ng":
+            if len(args) < 2:
+                return "Utilisation : aircrack-ng -w <dictionnaire> <fichier.cap>", cwd, fs, processes
+            
+            wordlist_arg = ""
+            capfile_arg = ""
+            # parse arguments
+            for i, arg in enumerate(args):
+                if arg == "-w" and i + 1 < len(args):
+                    wordlist_arg = cls._resolve_path(args[i+1], cwd)
+                elif arg.endswith(".cap"):
+                    capfile_arg = cls._resolve_path(arg, cwd)
+
+            if not wordlist_arg or not capfile_arg:
+                return "Syntaxe incorrecte. Exemple : aircrack-ng -w wordlist.txt handshake.cap", cwd, fs, processes
+
+            if wordlist_arg not in fs:
+                return f"Fichier dictionnaire '{args[1]}' introuvable dans le répertoire actuel.", cwd, fs, processes
+            if capfile_arg not in fs:
+                return f"Fichier de capture '{args[-1]}' introuvable.", cwd, fs, processes
+
+            # Read wordlist to find matching key
+            wl_content = fs[wordlist_arg].get("content", "")
+            found_key = "AstaSecure123" # Default key
+            for line in wl_content.splitlines():
+                if "secure" in line.lower() or "password" in line.lower() or "asta" in line.lower():
+                    found_key = line.strip()
+                    break
+
+            # Print beautiful brute-force decrypt output
+            crack_output = (
+                "Aircrack-ng 1.7\n\n"
+                "      [00:00:03] 14210 keys tested (4736.6 k/s)\n\n"
+                "      KEY FOUND! [ " + found_key + " ]\n\n"
+                "            Master Key     : DE 23 A5 FD 41 B2 DE 93 F0 AC B1 3E 45 FE AD C2\n"
+                "            Transient Key  : 4F BE B1 93 DE AC B3 12 CC D5 EE 19 4E BA D9 12"
+            )
+            # Create a success log key file in home dir to validate the level
+            fs["/home/user/key.txt"] = {
+                "content": found_key,
+                "perms": "644",
+                "owner": "user",
+                "is_dir": False
+            }
+            return crack_output, cwd, fs, processes
+
+        elif cmd == "iwconfig":
+            is_mon = "/sys/class/net/wlan0mon" in fs
+            output = (
+                "lo        no wireless extensions.\n\n"
+                "eth0      no wireless extensions.\n\n"
+                "wlan0     IEEE 802.11  ESSID:off/any  \n"
+                "          Mode:" + ("Monitor" if is_mon else "Managed") + "  Frequency:2.437 GHz  Access Point: Not-Associated   \n"
+                "          Tx-Power=20 dBm   Sensitivity=0/3  \n"
+                "          Retry short limit:7   RTS thr:off   Fragment thr:off\n"
+                "          Power Management:off"
+            )
+            return output, cwd, fs, processes
+
+        elif cmd == "ifconfig":
+            is_mon = "/sys/class/net/wlan0mon" in fs
+            mon_section = ""
+            if is_mon:
+                mon_section = (
+                    "wlan0mon  Link encap:UNSPEC  HWaddr 00-14-6C-7E-40-80-00-00-00-00-00-00-00-00-00-00  \n"
+                    "          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1\n"
+                    "          RX packets:412 errors:0 dropped:0 overruns:0 frame:0\n"
+                    "          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0\n"
+                    "          collisions:0 txqueuelen:1000 \n"
+                    "          RX bytes:45212 (45.2 KB)  TX bytes:0 (0.0 B)\n\n"
+                )
+            
+            output = (
+                "eth0      Link encap:Ethernet  HWaddr 00:0c:29:12:34:56  \n"
+                "          inet addr:192.168.1.64  Bcast:192.168.1.255  Mask:255.255.255.0\n"
+                "          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1\n"
+                "          RX packets:142 errors:0 dropped:0 overruns:0 frame:0\n"
+                "          TX packets:95 errors:0 dropped:0 overruns:0 carrier:0\n"
+                "          collisions:0 txqueuelen:1000 \n"
+                "          RX bytes:15214 (15.2 KB)  TX bytes:9512 (9.5 KB)\n\n" +
+                mon_section +
+                "lo        Link encap:Local Loopback  \n"
+                "          inet addr:127.0.0.1  Mask:255.0.0.0\n"
+                "          UP LOOPBACK RUNNING  MTU:65536  Metric:1\n"
+                "          RX packets:10 errors:0 dropped:0 overruns:0 frame:0\n"
+                "          TX packets:10 errors:0 dropped:0 overruns:0 carrier:0\n"
+                "          collisions:0 txqueuelen:1000 \n"
+                "          RX bytes:640 (640.0 B)  TX bytes:640 (640.0 B)"
+            )
+            return output, cwd, fs, processes
+
+        # --- STANDARD SYSTEM COMMANDS ---
         if cmd == "pwd":
             return cwd, cwd, fs, processes
 

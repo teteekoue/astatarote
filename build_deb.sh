@@ -36,29 +36,39 @@ echo "[*] Création du script de lancement /usr/bin/astatarote..."
 cat << 'EOF' > "${PKG_DIR}/usr/bin/astatarote"
 #!/bin/bash
 
-# Port to run on
-PORT=8000
-
-# Check if port is already in use
-if lsof -i :$PORT &>/dev/null; then
-    echo "[!] Le port $PORT est déjà utilisé. Lancement du navigateur..."
-else
-    echo "[*] Démarrage du serveur backend d'Astatarote sur le port $PORT..."
-    cd /usr/share/astatarote
-    PYTHONPATH=/usr/share/astatarote /usr/share/astatarote/backend/.venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port $PORT > /tmp/astatarote_backend.log 2>&1 &
-    # Give the backend 3 seconds to spin up
-    sleep 3
+# Check arguments
+if [ "$1" == "off" ]; then
+    echo "[*] Arrêt complet d'Astatarote (Serveurs et services)..."
+    pkill -f "uvicorn backend.app.main:app" && echo "[+] Tous les services ont été arrêtés !" || echo "[-] Aucun service Astatarote actif trouvé."
+    exit 0
 fi
 
-# Automatically open browser
-echo "[*] Ouverture du navigateur vers la console Astatarote..."
-if command -v xdg-open &> /dev/null; then
-    xdg-open "http://127.0.0.1:$PORT/"
-elif command -v gnome-open &> /dev/null; then
-    gnome-open "http://127.0.0.1:$PORT/"
-else
-    echo "[!] Navigateur introuvable. Veuillez ouvrir manuellement : http://127.0.0.1:$PORT/"
+if [ "$1" == "on" ] || [ -z "$1" ]; then
+    PORT=8000
+    if lsof -i :$PORT &>/dev/null; then
+        echo "[!] Le port $PORT est déjà utilisé. Lancement du navigateur..."
+    else
+        echo "[*] Démarrage du serveur backend d'Astatarote sur le port $PORT..."
+        cd /usr/share/astatarote
+        PYTHONPATH=/usr/share/astatarote /usr/share/astatarote/backend/.venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port $PORT > /tmp/astatarote_backend.log 2>&1 &
+        # Give the backend 3 seconds to spin up
+        sleep 3
+    fi
+
+    # Automatically open browser
+    echo "[*] Ouverture du navigateur vers la console Astatarote..."
+    if command -v xdg-open &> /dev/null; then
+        xdg-open "http://127.0.0.1:$PORT/"
+    elif command -v gnome-open &> /dev/null; then
+        gnome-open "http://127.0.0.1:$PORT/"
+    else
+        echo "[!] Navigateur introuvable. Veuillez ouvrir manuellement : http://127.0.0.1:$PORT/"
+    fi
+    exit 0
 fi
+
+echo "Usage : astatarote [on|off]"
+exit 1
 EOF
 
 chmod +x "${PKG_DIR}/usr/bin/astatarote"
