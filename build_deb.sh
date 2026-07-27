@@ -2,7 +2,7 @@
 
 # Script to build .deb packages for amd64 and i386 architectures
 ARCH=${1:-"amd64"}
-VERSION="1.0.0"
+VERSION=${2:-"1.0.3"}
 PKG_DIR="pkg_build_${ARCH}"
 
 echo "[*] Initialisation de la construction du paquet .deb pour l'architecture ${ARCH}..."

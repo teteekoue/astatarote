@@ -32,10 +32,16 @@ jobs:
       - name: Build Debian Packages (amd64 and i386)
         run: |
           chmod +x build_deb.sh
+          # Extract version from tag name (e.g. v1.0.3 -> 1.0.3), defaulting to 1.0.3 if not a tag
+          VERSION_TAG=$(echo "${{ github.ref_name }}" | sed 's/v//')
+          if [ -z "$VERSION_TAG" ] || [ "${{ github.ref_name }}" = "main" ]; then
+            VERSION_TAG="1.0.3"
+          fi
+          echo "[*] Compiling packages with version: $VERSION_TAG"
           # Build 64-bit AMD64 package
-          ./build_deb.sh amd64
+          ./build_deb.sh amd64 $VERSION_TAG
           # Build 32-bit I386 package
-          ./build_deb.sh i386
+          ./build_deb.sh i386 $VERSION_TAG
 
       - name: Verify Build Outputs
         run: |
@@ -52,26 +58,21 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            astatarote_1.0.0_amd64.deb
-            astatarote_1.0.0_i386.deb
+            astatarote_*.deb
           body: |
             ## Astatarote - Release v${{ github.ref_name }}
             
             Cette version contient les installateurs Debian `.deb` prêts à l'emploi d'**Astatarote** pour les architectures 32-bit (i386) et 64-bit (amd64).
             
-            ### 📦 Téléchargements :
-            - **64-bit (amd64)** : `astatarote_1.0.0_amd64.deb`
-            - **32-bit (i386)** : `astatarote_1.0.0_i386.deb`
-            
             ### 🚀 Instructions d'installation :
-            Pour installer Astatarote sur votre distribution Debian, Ubuntu, Mint ou Kali Linux, ouvrez un terminal et exécutez :
+            Pour installer Astatarote sur votre distribution Debian, Ubuntu, Mint ou Kali Linux, ouvrez un terminal et exécutez le fichier téléchargé (par exemple pour la version 1.0.3) :
             
             ```bash
-            sudo dpkg -i astatarote_1.0.0_amd64.deb
+            sudo dpkg -i astatarote_1.0.3_amd64.deb
             sudo apt-get install -f # Répare les dépendances système manquantes si nécessaire
             ```
             
             ### 🎮 Lancer l'application :
-            Tapez simplement `astatarote` dans votre console ou lancez l'application depuis votre menu des applications système !
+            Tapez simplement `astatarote on` (ou `astatarote`) dans votre console pour démarrer et ouvrir le navigateur, et `astatarote off` pour arrêter tous les services d'Astatarote !
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

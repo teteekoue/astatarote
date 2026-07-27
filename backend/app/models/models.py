@@ -45,6 +45,12 @@ class Level(Base):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     objective = Column(Text, nullable=False)
+    
+    # New columns for highly inspired problem situations, clear instructions and precise tech support
+    situation_probleme = Column(Text, nullable=True)
+    consigne = Column(Text, nullable=True)
+    support_technique = Column(Text, nullable=True)
+
     scenario = Column(JSON, default=dict)         # initial_state, expected_state, commands_allowed, etc.
     hints = Column(JSON, default=list)            # list of hints
     difficulty = Column(Integer, default=1)       # 1-10

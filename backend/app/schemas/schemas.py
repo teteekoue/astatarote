@@ -78,6 +78,12 @@ class LevelResponse(BaseModel):
     title: str
     description: str
     objective: str
+    
+    # New fields for high inspiration
+    situation_probleme: Optional[str] = None
+    consigne: Optional[str] = None
+    support_technique: Optional[str] = None
+
     scenario: Dict[str, Any]
     hints: List[str]
     difficulty: int
