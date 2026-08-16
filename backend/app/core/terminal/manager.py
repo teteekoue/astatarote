@@ -15,6 +15,7 @@ import signal
 import struct
 import termios
 import threading
+import time
 from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger("astarote.terminal")
@@ -86,6 +87,19 @@ class TerminalSession:
         self.pid = pid
         self.master_fd = master_fd
         os.set_blocking(master_fd, False)
+
+        # Disable bash history expansion so that '!' (e.g. in HTML echoed
+        # content such as "<!DOCTYPE html>") is not treated as a history
+        # command, which would break echo/cat commands in the sandbox.
+        self.write(b"set +o histexpand\r")
+        time.sleep(0.2)
+        try:
+            while True:
+                chunk = os.read(self.master_fd, 65536)
+                if not chunk:
+                    break
+        except (BlockingIOError, OSError):
+            pass
 
     def write(self, data: bytes) -> None:
         if self.closed or self.master_fd is None:

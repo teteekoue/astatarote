@@ -54,6 +54,5 @@ export function wsUrl(path: string): string {
   if (window.location.port === "3000") {
     host = window.location.hostname + ":8000";
   }
-  const token = getToken() ?? "";
-  return `${protocol}//${host}${path}?token=${encodeURIComponent(token)}`;
+  return `${protocol}//${host}${path}`;
 }

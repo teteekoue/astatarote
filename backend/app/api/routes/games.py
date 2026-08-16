@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional
+
+logger = logging.getLogger("astarote.api.games")
 
 from backend.app.core.config import settings
 from backend.app.core.database.session import get_db
@@ -131,6 +135,40 @@ def create_game(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # The AI creates every level entirely itself (scenario, files, mission,
+    # support, validation) from the user's goal. Generate all levels first so
+    # we never create a game if the AI cannot produce them.
+    raw_levels: Dict[int, Dict[str, Any]] = {}
+    errors: List[str] = []
+
+    with ThreadPoolExecutor(max_workers=TOTAL_LEVELS) as pool:
+        futures = {
+            pool.submit(
+                AIService.generate_level,
+                domain=game_in.domain,
+                user_level=game_in.level,
+                level_index=idx,
+                custom_prompt=game_in.custom_prompt,
+                preferences=current_user.preferences or {},
+            ): idx
+            for idx in range(TOTAL_LEVELS)
+        }
+        try:
+            for fut in as_completed(futures, timeout=90.0):
+                idx = futures[fut]
+                try:
+                    raw_levels[idx] = fut.result()
+                except Exception as e:
+                    errors.append(f"Niveau {idx + 1} : {e}")
+        except TimeoutError:
+            errors.append("La génération IA a dépassé le délai (90 s).")
+
+    if errors:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="La génération IA des niveaux a échoué : " + " ; ".join(errors),
+        )
+
     game = Game(
         user_id=current_user.id,
         name=game_in.name,
@@ -148,22 +186,7 @@ def create_game(
     db.refresh(game)
 
     for idx in range(TOTAL_LEVELS):
-        try:
-            raw_level = AIService.generate_level(
-                domain=game.domain,
-                user_level=game.level,
-                level_index=idx,
-                custom_prompt=game_in.custom_prompt,
-                preferences=current_user.preferences or {},
-            )
-        except Exception as e:
-            raw_level = None
-
-        if not raw_level:
-            # Ultra-safe fallback if even the template fails
-            raw_level = AIService._generate_fallback_level(
-                game.domain, game.level, idx, game_in.custom_prompt
-            )
+        raw_level = raw_levels[idx]
 
         level = Level(
             game_id=game.id,

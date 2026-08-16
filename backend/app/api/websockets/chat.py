@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.database.session import SessionLocal
 from backend.app.core.ai.service import AIService
-from backend.app.api.routes.auth import decode_token
 from backend.app.models.models import Game, Level, GameState, User
 
 logger = logging.getLogger("astarote.websockets.chat")
@@ -16,31 +15,23 @@ router = APIRouter()
 
 @router.websocket("/ws/chat/{game_id}")
 async def chat_websocket(websocket: WebSocket, game_id: int):
-    token = websocket.query_params.get("token")
     await websocket.accept()
 
     db = SessionLocal()
     try:
-        if not token or not decode_token(token):
-            await websocket.send_text(json.dumps({
-                "sender": "ai", "message": "[ERREUR] Authentification requise.",
-                "timestamp": str(datetime.utcnow()),
-            }))
-            await websocket.close(code=4401)
-            return
-
-        username = decode_token(token)
-        user = db.query(User).filter(User.username == username).first()
         game = db.query(Game).filter(Game.id == game_id).first()
-        if not user or not game or game.user_id != user.id:
+        if not game:
             await websocket.send_text(json.dumps({
-                "sender": "ai", "message": "[ERREUR] Accès refusé à ce laboratoire.",
+                "sender": "ai", "message": "Laboratoire introuvable.",
                 "timestamp": str(datetime.utcnow()),
             }))
             await websocket.close(code=4403)
             return
 
-        user_prefs = user.preferences if user else {"provider_ia": "fallback"}
+        # Private single-user instance: use the first account's AI preferences.
+        first_user = db.query(User).order_by(User.id.asc()).first()
+        user_prefs = (first_user.preferences if first_user and first_user.preferences
+                      else {"provider_ia": "fallback"})
 
         level_index = game.current_level_index
         level = db.query(Level).filter(

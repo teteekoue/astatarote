@@ -8,8 +8,7 @@ from sqlalchemy.orm import Session
 from backend.app.core.database.session import SessionLocal
 from backend.app.core.terminal.manager import TerminalManager, is_dangerous, GUARD_MESSAGE
 from backend.app.core.terminal.sandbox import SandboxManager
-from backend.app.api.routes.auth import decode_token
-from backend.app.models.models import Game, Level, User
+from backend.app.models.models import Game, Level
 
 logger = logging.getLogger("astarote.websockets.terminal")
 router = APIRouter()
@@ -51,23 +50,15 @@ async def _forward_to_shell(session, websocket, text: str) -> None:
 
 @router.websocket("/ws/terminal/{game_id}")
 async def terminal_websocket(websocket: WebSocket, game_id: int):
-    token = websocket.query_params.get("token")
     await websocket.accept()
 
     db = SessionLocal()
     session = None
     current_level_id = None
     try:
-        if not token or not decode_token(token):
-            await websocket.send_text(json.dumps({"output": "\r\n[ERREUR] Authentification requise.\r\n"}))
-            await websocket.close(code=4401)
-            return
-
-        username = decode_token(token)
-        user = db.query(User).filter(User.username == username).first()
         game = db.query(Game).filter(Game.id == game_id).first()
-        if not user or not game or game.user_id != user.id:
-            await websocket.send_text(json.dumps({"output": "\r\n[ERREUR] Accès refusé à ce laboratoire.\r\n"}))
+        if not game:
+            await websocket.send_text(json.dumps({"output": "\r\n[ERREUR] Laboratoire introuvable.\r\n"}))
             await websocket.close(code=4403)
             return
 
