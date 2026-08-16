@@ -1,6 +1,17 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Cpu, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { UserType } from '../../App';
+import React, { useState } from "react";
+import {
+  ArrowLeft,
+  Cpu,
+  Sparkles,
+  AlertTriangle,
+  ShieldCheck,
+  Wifi,
+  Lock,
+  Terminal,
+  Wand2,
+} from "lucide-react";
+import { api } from "../../lib/api";
+import { UserType } from "../../App";
 
 interface CreateGameProps {
   user: UserType;
@@ -8,118 +19,149 @@ interface CreateGameProps {
   onCancel: () => void;
 }
 
+interface GameCreated {
+  id: number;
+}
+
+const STEPS = [
+  "Analyse de ta demande d'apprentissage...",
+  "Conception du plan de cours par l'IA Architecte...",
+  "Génération des scénarios et des consignes précises...",
+  "Provisionnement de l'arborescence des fichiers réels...",
+  "Verrouillage de la sandbox et des contrôles de validation...",
+  "Laboratoire prêt. Initialisation du premier défi...",
+];
+
+const DOMAINS = [
+  {
+    id: "linux",
+    label: "Administration Linux",
+    icon: Terminal,
+    color: "text-blue-400 border-blue-500/25 bg-blue-500/10",
+  },
+  {
+    id: "security",
+    label: "Cybersécurité",
+    icon: Lock,
+    color: "text-red-400 border-red-500/25 bg-red-500/10",
+  },
+  {
+    id: "network",
+    label: "Réseaux",
+    icon: Wifi,
+    color: "text-asta-violet border-asta-violet/25 bg-asta-violet/10",
+  },
+];
+
+const PRESETS = [
+  {
+    title: "Permissions & Exploration",
+    domain: "linux",
+    level: "beginner",
+    prompt: "apprendre les permissions linux chmod chown et explorer le système de fichiers",
+    description: "Débutant — chmod, chown, localisation d'informations sensibles.",
+  },
+  {
+    title: "Sécuriser un serveur web",
+    domain: "security",
+    level: "intermediate",
+    prompt: "durcir la configuration d'un serveur web apache et désactiver l'indexation des dossiers",
+    description: "Intermédiaire — durcissement de configuration et bonnes pratiques.",
+  },
+  {
+    title: "Audit de logs SSH",
+    domain: "security",
+    level: "intermediate",
+    prompt: "analyser un fichier auth.log pour détecter une attaque par force brute ssh",
+    description: "Intermédiaire — analyse de logs et détection d'intrusion.",
+  },
+  {
+    title: "Cartographie réseau",
+    domain: "network",
+    level: "beginner",
+    prompt: "cartographier les hôtes et services d'un réseau interne via les fichiers de configuration",
+    description: "Débutant — résolution de noms, hôtes et services.",
+  },
+];
+
 export default function CreateGame({ user, onGameCreated, onCancel }: CreateGameProps) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [domain, setDomain] = useState('linux');
-  const [level, setLevel] = useState('beginner');
-  const [customPrompt, setCustomPrompt] = useState('');
-  
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [domain, setDomain] = useState("linux");
+  const [level, setLevel] = useState("beginner");
+  const [customPrompt, setCustomPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generatingStep, setGeneratingStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const steps = [
-    "Analyse de votre demande d'apprentissage...",
-    "Appel à l'IA Architecte pour la conception du plan de cours...",
-    "Création de la structure de niveaux personnalisée...",
-    "Définition des scénarios et des états de fichiers simulés...",
-    "Configuration du sandbox virtuel et du gardien de sécurité...",
-    "Génération finalisée ! Initialisation du premier défi..."
-  ];
-
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    
+
     setGenerating(true);
     setGeneratingStep(0);
     setError(null);
 
-    // Dynamic generation simulation step increments
     const interval = setInterval(() => {
-      setGeneratingStep((prev) => {
-        if (prev < steps.length - 1) {
-          return prev + 1;
-        }
-        return prev;
-      });
-    }, 1500);
+      setGeneratingStep((prev) => (prev < STEPS.length - 1 ? prev + 1 : prev));
+    }, 1400);
 
     try {
-      const res = await fetch('/api/games', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || `Apprendre ${domain} (${level})`,
-          domain,
-          level,
-          custom_prompt: customPrompt.trim() || undefined
-        }),
+      const game = await api.post<GameCreated>("/api/games", {
+        name: name.trim(),
+        description: description.trim() || `Apprendre ${domain} (${level})`,
+        domain,
+        level,
+        custom_prompt: customPrompt.trim() || undefined,
       });
-
       clearInterval(interval);
-
-      if (res.ok) {
-        const gameData = await res.json();
-        // Pause briefly on the final step to make it feel satisfying
-        setGeneratingStep(steps.length - 1);
-        setTimeout(() => {
-          onGameCreated(gameData.id);
-        }, 1000);
-      } else {
-        const errData = await res.json();
-        setError(errData.detail || "Échec de la génération du jeu.");
-        setGenerating(false);
-      }
+      setGeneratingStep(STEPS.length - 1);
+      setTimeout(() => onGameCreated(game.id), 900);
     } catch (err) {
       clearInterval(interval);
-      console.error(err);
-      setError("Erreur de communication réseau avec l'IA Architecte.");
+      setError(err instanceof Error ? err.message : "Erreur réseau avec l'IA Architecte.");
       setGenerating(false);
     }
   };
 
-  const handleQuickSelect = (title: string, dom: string, lvl: string, promptText: string) => {
-    setName(title);
-    setDomain(dom);
-    setLevel(lvl);
-    setCustomPrompt(promptText);
-    setDescription(`Lab adaptatif concentré sur : ${title}`);
+  const handlePreset = (p: (typeof PRESETS)[number]) => {
+    setName(p.title);
+    setDomain(p.domain);
+    setLevel(p.level);
+    setCustomPrompt(p.prompt);
+    setDescription(p.description);
   };
 
   if (generating) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-gradient-to-b from-[#070A13] to-[#0B0F19]">
-        <div className="max-w-md w-full bg-[#111827] border border-gray-800 p-8 rounded-2xl text-center space-y-6 shadow-2xl">
-          <div className="relative">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#10B981] mx-auto"></div>
-            <Cpu className="h-6 w-6 text-[#10B981] absolute inset-0 m-auto animate-pulse" />
+      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-gradient-to-b from-ink-deep to-ink-base">
+        <div className="max-w-md w-full panel p-8 text-center space-y-6 shadow-card animate-fade-in">
+          <div className="relative mx-auto w-fit">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-asta-green"></div>
+            <Cpu className="h-6 w-6 text-asta-green absolute inset-0 m-auto animate-pulse-glow" />
           </div>
-          
+
           <div className="space-y-2">
-            <h4 className="font-mono text-lg font-bold text-white tracking-wider uppercase">Génération d'Astatarote Lab</h4>
-            <p className="text-xs text-gray-500 font-mono">IA: {user.preferences.provider_ia || "fallback"}</p>
+            <h4 className="font-display text-lg font-bold text-white tracking-wider uppercase">
+              Génération du laboratoire
+            </h4>
+            <p className="text-xs text-gray-500 font-mono">Moteur : {user.preferences.provider_ia || "fallback"}</p>
           </div>
 
-          <div className="p-4 bg-gray-950 border border-gray-850 rounded-xl">
-            <p className="text-sm font-mono text-[#10B981] animate-pulse">
-              {steps[generatingStep]}
-            </p>
+          <div className="p-4 bg-ink-deep/70 border border-ink-line rounded-xl">
+            <p className="text-sm font-mono text-asta-green animate-pulse">{STEPS[generatingStep]}</p>
           </div>
 
-          <div className="w-full bg-gray-950 rounded-full h-1 overflow-hidden">
-            <div 
-              className="bg-[#10B981] h-1 rounded-full transition-all duration-500"
-              style={{ width: `${((generatingStep + 1) / steps.length) * 100}%` }}
+          <div className="w-full bg-ink-deep rounded-full h-1 overflow-hidden">
+            <div
+              className="bg-asta-green h-1 rounded-full transition-all duration-500 shadow-glow-sm"
+              style={{ width: `${((generatingStep + 1) / STEPS.length) * 100}%` }}
             ></div>
           </div>
 
           <p className="text-[11px] text-gray-500 leading-relaxed font-mono">
-            Veuillez patienter. L'architecte construit les dossiers, fichiers virtuels, permissions, et configurateurs de logs pour vos défis.
+            L'Architecte construit l'arborescence, les permissions, les fichiers sources et les contrôles
+            de validation du premier défi.
           </p>
         </div>
       </div>
@@ -127,164 +169,138 @@ export default function CreateGame({ user, onGameCreated, onCancel }: CreateGame
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full space-y-6">
-      {/* Back button */}
-      <button 
-        onClick={onCancel}
-        className="flex items-center space-x-2 text-gray-400 hover:text-[#10B981] transition font-mono text-sm"
-      >
+    <div className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6">
+      <button onClick={onCancel} className="flex items-center gap-2 text-gray-400 hover:text-asta-green transition font-mono text-sm">
         <ArrowLeft className="h-4 w-4" />
-        <span>Retour au Tableau de bord</span>
+        Retour au tableau de bord
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Creation Form */}
-        <div className="lg:col-span-2 bg-[#111827] border border-gray-800 p-6 rounded-2xl space-y-6">
-          <div className="flex items-center space-x-3 border-b border-gray-850 pb-4">
-            <div className="p-2 bg-[#10B981]/10 rounded-lg border border-[#10B981]/20">
-              <Sparkles className="h-5 w-5 text-[#10B981]" />
+        {/* Form */}
+        <div className="lg:col-span-2 panel p-7 space-y-6 animate-fade-in">
+          <div className="flex items-center gap-3 border-b border-ink-line pb-4">
+            <div className="p-2.5 bg-asta-green/10 rounded-lg border border-asta-green/20">
+              <Wand2 className="h-5 w-5 text-asta-green" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white font-mono">Configurer mon Parcours Adaptatif</h2>
-              <p className="text-xs text-gray-400">Décrivez vos objectifs de formation</p>
+              <h2 className="text-lg font-display font-bold text-white">Configurer mon parcours adaptatif</h2>
+              <p className="text-xs text-gray-400">Décris ton objectif de formation — l'IA bâtit les défis.</p>
             </div>
           </div>
 
           {error && (
-            <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center space-x-2.5 text-xs text-red-400 font-mono">
+            <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2.5 text-xs text-red-400 font-mono">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          <form onSubmit={handleCreate} className="space-y-4">
+          <form onSubmit={handleCreate} className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-mono text-gray-400">Nom du Laboratoire *</label>
+                <label className="text-xs font-mono text-gray-400">Nom du laboratoire *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Sécuriser Nginx"
+                  placeholder="Ex : Durcir un serveur SSH"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-gray-950 border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-2.5 rounded-xl text-sm font-mono"
+                  className="input-field"
                 />
               </div>
-
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-gray-400">Description courte</label>
                 <input
                   type="text"
-                  placeholder="Ex: Exercices pratiques pour auditer un site web"
+                  placeholder="Ex : Exercices sur les permissions et les logs"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full bg-gray-950 border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-2.5 rounded-xl text-sm font-mono"
+                  className="input-field"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono text-gray-400">Thématique Globale</label>
-                <select
-                  value={domain}
-                  onChange={(e) => setDomain(e.target.value)}
-                  className="w-full bg-gray-950 border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-2.5 rounded-xl text-sm font-mono text-gray-300"
-                >
-                  <option value="linux">Administration Linux Générale</option>
-                  <option value="security">Cybersécurité Offensive & Défensive</option>
-                  <option value="network">Réseaux et Protocoles</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono text-gray-400">Niveau de Difficulté Initial</label>
-                <select
-                  value={level}
-                  onChange={(e) => setLevel(e.target.value)}
-                  className="w-full bg-gray-950 border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-2.5 rounded-xl text-sm font-mono text-gray-300"
-                >
-                  <option value="beginner">Débutant (Novice à Apprenti)</option>
-                  <option value="intermediate">Intermédiaire (Administrateur)</option>
-                  <option value="advanced">Avancé (Expert / Reverse Engineer)</option>
-                </select>
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-gray-400">Thématique</label>
+              <div className="grid grid-cols-3 gap-2.5">
+                {DOMAINS.map((d) => {
+                  const Icon = d.icon;
+                  const active = domain === d.id;
+                  return (
+                    <button
+                      type="button"
+                      key={d.id}
+                      onClick={() => setDomain(d.id)}
+                      className={`p-3 rounded-xl border font-mono text-xs font-bold flex flex-col items-center gap-2 transition-all duration-200 ${
+                        active
+                          ? `${d.color} border-current`
+                          : "bg-ink-deep/50 border-ink-line text-gray-500 hover:text-gray-300"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {d.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div className="space-y-1.5">
+              <label className="text-xs font-mono text-gray-400">Niveau de difficulté initial</label>
+              <select
+                value={level}
+                onChange={(e) => setLevel(e.target.value)}
+                className="input-field text-gray-300"
+              >
+                <option value="beginner">Débutant — Novice à Apprenti</option>
+                <option value="intermediate">Intermédiaire — Administrateur</option>
+                <option value="advanced">Avancé — Expert</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
               <label className="text-xs font-mono text-gray-400">
-                Instruction personnalisée pour l'IA Architecte (Prompt libre)
+                Instruction personnalisée pour l'IA (facultatif)
               </label>
               <textarea
                 rows={3}
-                placeholder="Ex : Je veux apprendre à configurer les permissions chmod, chown et analyser un historique de logs d'intrusion SSH."
+                placeholder="Ex : Je veux apprendre à analyser auth.log, détecter une force brute, puis durcir sshd_config."
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
-                className="w-full bg-gray-950 border border-gray-800 focus:border-[#10B981]/60 focus:outline-none p-2.5 rounded-xl text-sm font-mono"
+                className="input-field resize-none"
               />
               <p className="text-[10px] text-gray-500 leading-relaxed font-mono">
-                L'IA Architecte se servira de cette consigne pour construire sur-mesure vos 3 niveaux de jeu, leurs variables, leurs arborescences de dossiers, et les contrôles automatiques.
+                L'IA Architecte s'appuie sur cette consigne pour générer 3 défis cohérents, avec des fichiers
+                réels, des consignes précises et des contrôles de validation automatiques.
               </p>
             </div>
 
-            <button
-              type="submit"
-              disabled={!name.trim()}
-              className="w-full py-3 bg-[#10B981] hover:bg-emerald-600 disabled:opacity-50 text-black font-bold font-mono rounded-xl text-sm flex items-center justify-center space-x-2 transition shadow-lg"
-            >
-              <Cpu className="h-4 w-4" />
-              <span>Générer mes 3 Défis Adaptatifs</span>
+            <button type="submit" disabled={!name.trim()} className="btn-primary w-full !py-3">
+              <Sparkles className="h-4 w-4" />
+              Générer mes 3 défis adaptatifs
             </button>
           </form>
         </div>
 
-        {/* Quick presets list */}
-        <div className="bg-gray-900/40 border border-gray-800 p-5 rounded-2xl space-y-4">
-          <div className="flex items-center space-x-2 pb-2 border-b border-gray-850">
-            <ShieldCheck className="h-4 w-4 text-[#10B981]" />
-            <h3 className="font-mono text-sm font-bold text-white">Scénarios Recommandés</h3>
+        {/* Presets */}
+        <div className="panel p-5 space-y-4 h-fit animate-fade-in">
+          <div className="flex items-center gap-2 pb-2 border-b border-ink-line">
+            <ShieldCheck className="h-4 w-4 text-asta-green" />
+            <h3 className="font-mono text-sm font-bold text-white">Scénarios recommandés</h3>
           </div>
-          <p className="text-xs text-gray-400 font-mono">Cliquez sur un préréglage pour le charger immédiatement :</p>
+          <p className="text-xs text-gray-400 font-mono">Clique sur un préréglage pour le charger :</p>
 
           <div className="space-y-2.5">
-            <button
-              onClick={() => handleQuickSelect(
-                "Audit et Permissions", 
-                "linux", 
-                "beginner", 
-                "permissions linux chmod chown secret"
-              )}
-              className="w-full text-left p-3 rounded-xl bg-gray-900 border border-gray-800 hover:border-[#10B981]/40 hover:bg-gray-850 transition duration-200"
-            >
-              <p className="font-mono font-bold text-xs text-gray-200">Permissions & Exploration</p>
-              <p className="text-[10px] text-gray-400 font-mono mt-1">Débutant - Apprendre chmod, chown et localiser des informations.</p>
-            </button>
-
-            <button
-              onClick={() => handleQuickSelect(
-                "Sécurité Web Apache", 
-                "security", 
-                "intermediate", 
-                "securiser serveur web apache autoindex"
-              )}
-              className="w-full text-left p-3 rounded-xl bg-gray-900 border border-gray-800 hover:border-[#10B981]/40 hover:bg-gray-850 transition duration-200"
-            >
-              <p className="font-mono font-bold text-xs text-gray-200">Sécuriser un Serveur Web</p>
-              <p className="text-[10px] text-gray-400 font-mono mt-1">Intermédiaire - Désactiver l'indexation de fichiers, configurer des hôtes.</p>
-            </button>
-
-            <button
-              onClick={() => handleQuickSelect(
-                "Analyse logs d'intrusion", 
-                "security", 
-                "intermediate", 
-                "analyser log auth.log brute force"
-              )}
-              className="w-full text-left p-3 rounded-xl bg-gray-900 border border-gray-800 hover:border-[#10B981]/40 hover:bg-gray-850 transition duration-200"
-            >
-              <p className="font-mono font-bold text-xs text-gray-200">Audit de Logs SSH</p>
-              <p className="text-[10px] text-gray-400 font-mono mt-1">Intermédiaire - Détecter une attaque force brute dans auth.log.</p>
-            </button>
+            {PRESETS.map((p, i) => (
+              <button
+                key={i}
+                onClick={() => handlePreset(p)}
+                className="w-full text-left p-3 rounded-xl bg-ink-deep/50 border border-ink-line hover:border-asta-green/40 hover:bg-ink-deep transition-all duration-200"
+              >
+                <p className="font-mono font-bold text-xs text-gray-200">{p.title}</p>
+                <p className="text-[10px] text-gray-500 font-mono mt-1">{p.description}</p>
+              </button>
+            ))}
           </div>
         </div>
       </div>

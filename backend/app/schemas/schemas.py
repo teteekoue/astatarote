@@ -1,50 +1,97 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
+# ---------------------------------------------------------------
 # User Schemas
+# ---------------------------------------------------------------
+
 class UserBase(BaseModel):
     username: str
     email: EmailStr
 
+
 class UserCreate(UserBase):
-    password: str
+    password: str = Field(min_length=6)
+
 
 class UserLogin(BaseModel):
     username: str
     password: str
+
 
 class UserPreferences(BaseModel):
     provider_ia: str = "fallback"  # fallback, nvidia, groq, fireworks, cohere, together
     api_key: Optional[str] = None
     theme: str = "dark"
     font_size: int = 14
-    terminal_type: str = "simulation" # simulation, docker, reel
+    terminal_type: str = "simulation"  # simulation, docker, reel
+
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    email: Optional[EmailStr] = None
+
+
+class UserPasswordUpdate(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
+
+def mask_api_key(key: Optional[str]) -> Optional[str]:
+    """Mask a secret API key for safe responses."""
+    if not key:
+        return None
+    if len(key) <= 8:
+        return "•" * len(key)
+    return f"{key[:4]}{'•' * (len(key) - 8)}{key[-4:]}"
+
 
 class UserResponse(UserBase):
     id: int
-    preferences: UserPreferences
+    preferences: Dict[str, Any]
     stats: Dict[str, Any]
     created_at: datetime
 
     class Config:
         from_attributes = True
 
+    @field_validator("preferences", mode="before")
+    @classmethod
+    def mask_api_key_in_preferences(cls, v: Any) -> Any:
+        if isinstance(v, dict) and v.get("api_key"):
+            v = dict(v)
+            v["api_key"] = mask_api_key(v["api_key"])
+        return v
+
+
 # Token Schemas
 class Token(BaseModel):
     access_token: str
-    token_type: str
+    token_type: str = "bearer"
+
+
+class AutoLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
 
 class TokenData(BaseModel):
     username: Optional[str] = None
 
+
+# ---------------------------------------------------------------
 # Game Schemas
+# ---------------------------------------------------------------
+
 class GameCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=120)
     description: Optional[str] = ""
     domain: str = "linux"  # linux, network, security
     level: str = "beginner"  # beginner, intermediate, advanced
     custom_prompt: Optional[str] = None
+
 
 class GameResponse(BaseModel):
     id: int
@@ -63,13 +110,10 @@ class GameResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ---------------------------------------------------------------
 # Level Schemas
-class ScenarioConfig(BaseModel):
-    type: str = "simulation" # simulation, docker, reel
-    initial_state: Dict[str, Any] = {}
-    expected_state: Dict[str, Any] = {}
-    commands_allowed: List[str] = []
-    forbidden_commands: List[str] = []
+# ---------------------------------------------------------------
 
 class LevelResponse(BaseModel):
     id: int
@@ -78,14 +122,11 @@ class LevelResponse(BaseModel):
     title: str
     description: str
     objective: str
-    
-    # New fields for high inspiration
     situation_probleme: Optional[str] = None
     consigne: Optional[str] = None
     support_technique: Optional[str] = None
-
     scenario: Dict[str, Any]
-    hints: List[str]
+    hints: List[str] = []
     difficulty: int
     points: int
     time_limit: int
@@ -97,6 +138,7 @@ class LevelResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 # Level Validation
 class ValidateResponse(BaseModel):
     success: bool
@@ -105,11 +147,12 @@ class ValidateResponse(BaseModel):
     badge_unlocked: Optional[str] = None
     next_level_index: Optional[int] = None
 
+
+# ---------------------------------------------------------------
 # Chat Schemas
+# ---------------------------------------------------------------
+
 class ChatMessage(BaseModel):
     sender: str  # "user" or "ai"
     message: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-class ChatHistory(BaseModel):
-    history: List[ChatMessage]

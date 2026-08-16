@@ -1,138 +1,186 @@
-import React from 'react';
-import { Award, ShieldCheck, Zap, Layers, User, Lock } from 'lucide-react';
-import { UserType } from '../../App';
+import React, { useState } from "react";
+import { UserRound, Camera, ShieldAlert, CheckCircle2, AlertTriangle } from "lucide-react";
+import { UserType } from "../../App";
+import { api } from "../../lib/api";
 
 interface ProfileProps {
   user: UserType;
+  onUserUpdate: (u: UserType) => void;
 }
 
-export default function Profile({ user }: ProfileProps) {
-  const allBadges = [
-    {
-      name: "Linux Ninja",
-      description: "Maîtrise des commandes Linux fondamentales et manipulation sécurisée des répertoires.",
-      iconColor: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-      glowClass: "neon-border-blue shadow-[0_0_20px_rgba(59,130,246,0.15)]"
-    },
-    {
-      name: "Network Sentinel",
-      description: "Sécurisation réseau, analyse de configurations et gestion des ports de serveurs.",
-      iconColor: "text-purple-400 bg-purple-500/10 border-purple-500/20",
-      glowClass: "neon-border shadow-[0_0_20px_rgba(16,185,129,0.15)]"
-    },
-    {
-      name: "Defender",
-      description: "Application de mesures de sécurité défensives, restriction d'accès et correction de privilèges.",
-      iconColor: "text-red-400 bg-red-500/10 border-red-500/20",
-      glowClass: "neon-border-red shadow-[0_0_20px_rgba(239,68,68,0.15)]"
-    },
-    {
-      name: "White Hat",
-      description: "Esprit éthique, audit proactif et détection responsable de vulnérabilités.",
-      iconColor: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-      glowClass: "shadow-[0_0_20px_rgba(245,158,11,0.1)]"
+export default function Profile({ user, onUserUpdate }: ProfileProps) {
+  const [username, setUsername] = useState(user.username);
+  const [email, setEmail] = useState(user.email || "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handleProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim()) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const updated = await api.put<UserType>("/api/users/me", { username: username.trim(), email: email.trim() || undefined });
+      onUserUpdate(updated);
+      setMessage({ type: "success", text: "Profil mis à jour avec succès." });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Erreur lors de la mise à jour." });
+    } finally {
+      setSaving(false);
     }
-  ];
+  };
+
+  const handlePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword) {
+      setMessage({ type: "error", text: "Renseigne le mot de passe actuel et le nouveau mot de passe." });
+      return;
+    }
+    if (newPassword.length < 8) {
+      setMessage({ type: "error", text: "Le nouveau mot de passe doit contenir au moins 8 caractères." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setMessage({ type: "error", text: "La confirmation du nouveau mot de passe ne correspond pas." });
+      return;
+    }
+    setSaving(true);
+    setMessage(null);
+    try {
+      const updated = await api.put<UserType>("/api/users/me/password", {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      onUserUpdate(updated);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setMessage({ type: "success", text: "Mot de passe modifié avec succès." });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Erreur lors du changement de mot de passe." });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 max-w-4xl mx-auto w-full space-y-8 select-none">
-      
-      {/* Profile summary header (glassmorphic card) */}
-      <div className="bg-[#090D1A]/90 border border-gray-850 p-8 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
-        <div className="flex items-center space-x-5">
-          <div className="h-16 w-16 rounded-2xl bg-[#10B981]/10 border-2 border-[#10B981] flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.15)]">
-            <User className="h-8 w-8 text-[#10B981]" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-white font-mono tracking-wide">{user.username}</h2>
-            <p className="text-xs text-gray-400 font-mono mt-1">Agent cyber-éducatif inscrit le {new Date(user.created_at).toLocaleDateString('fr-FR')}</p>
-          </div>
+    <div className="flex-1 overflow-y-auto p-8 space-y-6 max-w-3xl mx-auto w-full">
+      <div className="flex items-center gap-3 border-b border-ink-line/70 pb-4">
+        <div className="p-2.5 bg-asta-green/10 rounded-xl border border-asta-green/20">
+          <UserRound className="h-5 w-5 text-asta-green" />
         </div>
+        <div>
+          <h2 className="text-xl font-display font-bold text-white tracking-wide">Profil de l'agent</h2>
+          <p className="text-xs text-gray-400">Identité, coordonnées et sécurité du compte.</p>
+        </div>
+      </div>
 
-        <div className="text-center md:text-right bg-[#040712]/40 px-5 py-3.5 rounded-xl border border-gray-850">
-          <p className="text-[10px] text-gray-500 font-mono uppercase tracking-widest font-bold">Grade Global</p>
-          <p className="text-xl font-black font-mono text-amber-500 uppercase tracking-widest mt-1">
-            {user.stats.rank || "Novice"}
+      {message && (
+        <div
+          className={`p-3.5 rounded-xl border flex items-center gap-2.5 text-xs font-mono ${
+            message.type === "success"
+              ? "bg-asta-green/10 border-asta-green/20 text-asta-green"
+              : "bg-red-500/10 border-red-500/20 text-red-400"
+          }`}
+        >
+          {message.type === "success" ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertTriangle className="h-4 w-4 shrink-0" />}
+          <span>{message.text}</span>
+        </div>
+      )}
+
+      {/* Avatar */}
+      <div className="panel p-6 flex items-center gap-6 shadow-card">
+        <div className="relative">
+          <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-asta-green to-asta-violet flex items-center justify-center shadow-glow-sm">
+            <span className="text-2xl font-black font-mono text-white">
+              {user.username.charAt(0).toUpperCase()}
+            </span>
+          </div>
+          <button className="absolute -bottom-1.5 -right-1.5 p-1.5 bg-ink-deep border border-ink-line rounded-lg text-gray-400 hover:text-asta-green transition">
+            <Camera className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div>
+          <h3 className="text-lg font-mono font-bold text-white">{user.username}</h3>
+          <p className="text-xs text-gray-400 font-mono">
+            Grade : <span className="text-asta-green font-bold">{user.stats.rank || "Novice"}</span> ·{" "}
+            {user.stats.points || 0} points
           </p>
         </div>
       </div>
 
-      {/* Grid statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-[#090D1A]/70 border border-gray-850 p-6 rounded-2xl flex items-center space-x-4 shadow-xl">
-          <div className="p-4 bg-[#10B981]/10 rounded-xl border border-[#10B981]/20 text-[#10B981]">
-            <Zap className="h-5.5 w-5.5" />
+      {/* Identité */}
+      <form onSubmit={handleProfile} className="panel p-6 space-y-5 shadow-card">
+        <h4 className="section-title">
+          <UserRound className="h-4 w-4 text-asta-green" />
+          Identité
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-mono text-gray-400">Nom d'utilisateur *</label>
+            <input value={username} onChange={(e) => setUsername(e.target.value)} className="input-field" />
           </div>
-          <div>
-            <p className="text-[9px] text-gray-500 font-mono uppercase tracking-widest font-bold">Points d'Apprentissage</p>
-            <p className="text-xl font-black font-mono text-white mt-1">{user.stats.points || 0} pts</p>
-          </div>
-        </div>
-
-        <div className="bg-[#090D1A]/70 border border-gray-850 p-6 rounded-2xl flex items-center space-x-4 shadow-xl">
-          <div className="p-4 bg-blue-500/10 rounded-xl border border-blue-500/20 text-blue-400">
-            <Layers className="h-5.5 w-5.5" />
-          </div>
-          <div>
-            <p className="text-[9px] text-gray-500 font-mono uppercase tracking-widest font-bold">Niveaux complétés</p>
-            <p className="text-xl font-black font-mono text-white mt-1">{user.stats.levels_completed || 0} défis</p>
-          </div>
-        </div>
-
-        <div className="bg-[#090D1A]/70 border border-gray-850 p-6 rounded-2xl flex items-center space-x-4 shadow-xl">
-          <div className="p-4 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-400">
-            <Award className="h-5.5 w-5.5" />
-          </div>
-          <div>
-            <p className="text-[9px] text-gray-500 font-mono uppercase tracking-widest font-bold">Badges Obtenus</p>
-            <p className="text-xl font-black font-mono text-white mt-1">{(user.stats.badges || []).length} / {allBadges.length}</p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-mono text-gray-400">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="agent@astatarote.dev"
+              className="input-field"
+            />
           </div>
         </div>
-      </div>
+        <button type="submit" disabled={saving} className="btn-primary">
+          {saving ? "Enregistrement..." : "Enregistrer le profil"}
+        </button>
+      </form>
 
-      {/* Badges and certs list */}
-      <div className="space-y-6">
-        <div className="border-b border-gray-800/80 pb-3">
-          <h3 className="font-mono text-md font-bold text-gray-200 tracking-wide">Badges et Certifications Militaires</h3>
+      {/* Sécurité */}
+      <form onSubmit={handlePassword} className="panel p-6 space-y-5 shadow-card border-red-500/10">
+        <h4 className="section-title">
+          <ShieldAlert className="h-4 w-4 text-asta-amber" />
+          Sécurité du compte
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-mono text-gray-400">Mot de passe actuel *</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="••••••••"
+              className="input-field"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-mono text-gray-400">Nouveau mot de passe *</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="8 caractères min."
+              className="input-field"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-mono text-gray-400">Confirmation *</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Répète le nouveau"
+              className="input-field"
+            />
+          </div>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {allBadges.map((badge, idx) => {
-            const isUnlocked = (user.stats.badges || []).includes(badge.name);
-            return (
-              <div 
-                key={idx} 
-                className={`p-6 rounded-2xl border transition-all duration-300 flex items-start space-x-4 shadow-xl ${
-                  isUnlocked 
-                    ? `bg-[#090D1A]/90 border-gray-800 ${badge.glowClass}` 
-                    : 'bg-[#040712]/30 border-gray-900/40 opacity-40'
-                }`}
-              >
-                <div className={`p-4 rounded-xl border shrink-0 ${
-                  isUnlocked ? badge.iconColor : 'bg-gray-900 border-gray-800 text-gray-600'
-                }`}>
-                  {isUnlocked ? <ShieldCheck className="h-6 w-6" /> : <Lock className="h-6 w-6" />}
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center space-x-2">
-                    <h4 className="font-mono text-xs font-black text-white tracking-wide uppercase">{badge.name}</h4>
-                    {isUnlocked && (
-                      <span className="text-[8px] bg-[#10B981]/15 text-[#10B981] font-mono px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                        Unlocked
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-400 font-mono leading-relaxed font-medium">
-                    {badge.description}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+        <button type="submit" disabled={saving} className="btn-primary !bg-asta-amber/90 hover:!bg-asta-amber text-ink-deep">
+          Modifier le mot de passe
+        </button>
+      </form>
     </div>
   );
 }

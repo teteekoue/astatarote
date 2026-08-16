@@ -1,103 +1,270 @@
-import React, { useState } from 'react';
-import { ShieldCheck, BookOpen, Terminal, Compass, CheckCircle2, ChevronRight, HelpCircle, HardDrive } from 'lucide-react';
-import { LevelType } from './GameInterface';
+import React, { useState } from "react";
+import {
+  Swords,
+  ListChecks,
+  BookOpen,
+  Lightbulb,
+  Compass,
+  Clock,
+  Trophy,
+  Gauge,
+  Terminal,
+} from "lucide-react";
+import { LevelType } from "./GameInterface";
 
 interface LevelInstructionsProps {
   level: LevelType;
 }
 
 export default function LevelInstructions({ level }: LevelInstructionsProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'mission' | 'support'>('mission');
+  const [activeTab, setActiveTab] = useState<"mission" | "support">("mission");
 
   const formatTime = (secs: number) => {
-    const mins = Math.floor(secs / 60);
-    const remainingSecs = secs % 60;
-    return `${mins}m ${remainingSecs > 0 ? remainingSecs + 's' : ''}`;
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return s > 0 ? `${m}m ${s}s` : `${m}m`;
   };
 
-  const subObjectives = level.scenario?.expected_state?.files_checks || [];
+  const checks = level.scenario?.expected_state?.files_checks ?? [];
+
+  const renderMarkdown = (text?: string) => {
+    if (!text) return null;
+    const lines = text.split("\n");
+    const nodes: React.ReactNode[] = [];
+    let codeLang = "";
+    let codeLines: string[] = [];
+    let key = 0;
+
+    const flushCode = () => {
+      if (codeLines.length === 0) return;
+      nodes.push(
+        <pre
+          key={key++}
+          className="my-2.5 p-3 rounded-xl bg-ink-deep border border-ink-line overflow-x-auto text-[11px] font-mono text-asta-green leading-relaxed whitespace-pre"
+        >
+          {codeLines.join("\n")}
+        </pre>
+      );
+      codeLines = [];
+      codeLang = "";
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      const fence = trimmed.match(/^```(\w*)/);
+
+      if (fence || (trimmed.startsWith("~~~") && trimmed.trim().length <= 3)) {
+        if (codeLines.length > 0 || codeLang !== "") {
+          flushCode();
+          continue;
+        }
+        codeLang = fence ? fence[1] : "";
+        continue;
+      }
+
+      if (codeLines.length > 0 || codeLang !== "") {
+        codeLines.push(lines[i]);
+        continue;
+      }
+
+      if (trimmed.startsWith("###")) {
+        nodes.push(
+          <p key={key++} className="font-bold text-asta-green mt-4 mb-1 text-xs uppercase tracking-wider">
+            {trimmed.replace(/^###\s*/, "")}
+          </p>
+        );
+        continue;
+      }
+      if (trimmed.startsWith("##")) {
+        nodes.push(
+          <p key={key++} className="font-bold text-white mt-3 mb-1 text-xs uppercase tracking-wider">
+            {trimmed.replace(/^##\s*/, "")}
+          </p>
+        );
+        continue;
+      }
+      const orderedMatch = trimmed.match(/^(\d+)[).]\s+(.*)$/);
+      if (orderedMatch) {
+        nodes.push(
+          <div key={key++} className="flex items-start gap-2 text-gray-300 leading-relaxed">
+            <span className="text-asta-green mt-0.5 font-mono font-bold shrink-0">{orderedMatch[1]}.</span>
+            <span className="whitespace-pre-wrap break-words font-mono text-[11px]">
+              {renderInline(orderedMatch[2])}
+            </span>
+          </div>
+        );
+        continue;
+      }
+      if (trimmed.startsWith("- ")) {
+        nodes.push(
+          <div key={key++} className="flex items-start gap-2 text-gray-300 leading-relaxed">
+            <span className="text-asta-green mt-1 shrink-0">•</span>
+            <span className="whitespace-pre-wrap break-words font-mono text-[11px]">{renderInline(trimmed.slice(2))}</span>
+          </div>
+        );
+        continue;
+      }
+      if (trimmed.startsWith("**") && trimmed.endsWith("**")) {
+        nodes.push(
+          <p key={key++} className="font-bold text-asta-green text-xs mt-1">
+            {trimmed.slice(2, -2)}
+          </p>
+        );
+        continue;
+      }
+      if (trimmed === "") {
+        nodes.push(<div key={key++} className="h-2" />);
+        continue;
+      }
+      nodes.push(
+        <p key={key++} className="text-gray-300 leading-relaxed whitespace-pre-wrap break-words text-[11px]">
+          {renderInline(lines[i])}
+        </p>
+      );
+    }
+    flushCode();
+
+    return nodes;
+  };
+
+  const renderInline = (text: string) => {
+    const parts = text.split(/(`[^`]+`)/g);
+    return parts.map((part, j) =>
+      part.startsWith("`") && part.endsWith("`") ? (
+        <code key={j} className="px-1.5 py-0.5 rounded bg-ink-deep border border-ink-line text-asta-green font-mono text-[11px] break-words">
+          {part.slice(1, -1)}
+        </code>
+      ) : (
+        <span key={j}>{part}</span>
+      )
+    );
+  };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#050816]/95 select-none font-mono text-xs text-gray-300">
-      
-      {/* Tabs Selector at the top of the Left column */}
-      <div className="flex border-b border-gray-850 bg-gray-950/40 p-1.5 shrink-0">
+    <div className="flex-1 flex flex-col min-h-0 bg-ink-deep/60 select-none">
+      {/* Tabs */}
+      <div className="flex border-b border-ink-line bg-ink-panel/60 p-1.5 shrink-0 gap-1">
         <button
-          onClick={() => setActiveSubTab('mission')}
-          className={`flex-1 py-2 rounded-xl font-bold tracking-wider transition-all flex items-center justify-center space-x-2 ${
-            activeSubTab === 'mission'
-              ? 'bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/25'
-              : 'text-gray-500 hover:text-gray-300'
+          onClick={() => setActiveTab("mission")}
+          className={`flex-1 py-2 rounded-lg font-mono text-[10px] font-bold tracking-wider transition-all flex items-center justify-center gap-2 ${
+            activeTab === "mission"
+              ? "bg-asta-green/10 text-asta-green border border-asta-green/25"
+              : "text-gray-500 hover:text-gray-300 border border-transparent"
           }`}
         >
-          <Compass className="h-4 w-4" />
-          <span>MISSION</span>
+          <Swords className="h-3.5 w-3.5" />
+          MISSION
         </button>
         <button
-          onClick={() => setActiveSubTab('support')}
-          className={`flex-1 py-2 rounded-xl font-bold tracking-wider transition-all flex items-center justify-center space-x-2 ${
-            activeSubTab === 'support'
-              ? 'bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/25'
-              : 'text-gray-500 hover:text-gray-300'
+          onClick={() => setActiveTab("support")}
+          className={`flex-1 py-2 rounded-lg font-mono text-[10px] font-bold tracking-wider transition-all flex items-center justify-center gap-2 ${
+            activeTab === "support"
+              ? "bg-asta-green/10 text-asta-green border border-asta-green/25"
+              : "text-gray-500 hover:text-gray-300 border border-transparent"
           }`}
         >
-          <BookOpen className="h-4 w-4" />
-          <span>SUPPORT TECHNIQUE</span>
+          <BookOpen className="h-3.5 w-3.5" />
+          SUPPORT
         </button>
       </div>
 
-      {/* Main Column Pane Content */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-6">
-        
-        {activeSubTab === 'mission' ? (
+      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        {activeTab === "mission" ? (
           <>
-            {/* Meta Title block */}
+            {/* Header */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[9px] font-black bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                  Dossier Actif
+                <span className="chip bg-asta-violet/10 text-asta-violet border-asta-violet/25">
+                  DÉFI {level.level_index + 1}
                 </span>
-                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">INDEX : #{level.level_index + 1}</span>
+                <span className="text-[10px] text-gray-500 font-mono font-bold uppercase tracking-wider">
+                  Fiche {level.difficulty}/10
+                </span>
               </div>
-              <h2 className="text-sm font-black text-white leading-snug tracking-wide select-text">{level.title}</h2>
+              <h2 className="text-base font-display font-bold text-white leading-snug select-text">
+                {level.title}
+              </h2>
+
+              {/* Meta chips */}
+              <div className="flex flex-wrap gap-1.5">
+                <span className="chip bg-ink-deep text-gray-400 border-ink-line gap-1">
+                  <Clock className="h-3 w-3 text-asta-amber" />
+                  {formatTime(level.time_limit)}
+                </span>
+                <span className="chip bg-ink-deep text-gray-400 border-ink-line gap-1">
+                  <Trophy className="h-3 w-3 text-asta-green" />
+                  {level.points} pts
+                </span>
+                <span className="chip bg-ink-deep text-gray-400 border-ink-line gap-1">
+                  <Gauge className="h-3 w-3 text-asta-cyan" />
+                  Difficulté {level.difficulty}
+                </span>
+              </div>
             </div>
 
-            {/* Context & Description */}
+            {/* Situation */}
+            {level.situation_probleme && (
+              <div className="space-y-2">
+                <h3 className="section-title text-asta-violet">
+                  <Compass className="h-4 w-4" />
+                  Situation
+                </h3>
+                <div className="p-3.5 rounded-xl bg-ink-panel/70 border border-ink-line/70 text-gray-300 text-xs leading-relaxed select-text shadow-inset">
+                  {renderMarkdown(level.situation_probleme)}
+                </div>
+              </div>
+            )}
+
+            {/* Consigne */}
+            {level.consigne && (
+              <div className="space-y-2">
+                <h3 className="section-title text-asta-green">
+                  <ListChecks className="h-4 w-4" />
+                  Consigne d'exécution
+                </h3>
+                <div className="p-3.5 rounded-xl bg-asta-green/5 border border-asta-green/20 text-gray-200 text-xs leading-relaxed select-text space-y-1">
+                  {renderMarkdown(level.consigne)}
+                </div>
+              </div>
+            )}
+
+            {/* Objective */}
             <div className="space-y-2">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500">Description du Problème</h3>
-              <p className="text-xs text-gray-300 leading-relaxed select-text bg-[#03050f]/60 p-4 rounded-xl border border-gray-850/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.01)]">
-                {level.description}
-              </p>
-            </div>
-
-            {/* Main Objective */}
-            <div className="p-4 bg-[#10B981]/5 border border-[#10B981]/15 rounded-xl space-y-2.5">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-[#10B981] flex items-center space-x-1.5">
-                <ShieldCheck className="h-4 w-4" />
-                <span>Objectif Principal</span>
+              <h3 className="section-title">
+                <Terminal className="h-4 w-4 text-asta-cyan" />
+                Objectif
               </h3>
-              <p className="text-xs text-gray-200 select-text leading-relaxed">
+              <p className="text-xs text-gray-200 select-text leading-relaxed bg-ink-panel/70 border border-ink-line/70 rounded-xl p-3.5">
                 {level.objective}
               </p>
             </div>
 
-            {/* Validation criteria checklists */}
-            {subObjectives.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500">Critères de validation</h3>
-                <div className="space-y-2">
-                  {subObjectives.map((check: any, idx: number) => {
-                    const targetPath = check.path || "Fichier";
-                    const isPerm = check.perms ? ` (Permissions : ${check.perms})` : "";
-                    const isContent = check.content_contains ? ` (Doit contenir une directive spécifique)` : "";
-                    
+            {/* Validation criteria */}
+            {checks.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="section-title">
+                  <ListChecks className="h-4 w-4 text-asta-cyan" />
+                  Critères de validation
+                </h3>
+                <div className="space-y-1.5">
+                  {checks.map((check, idx) => {
+                    const details: string[] = [];
+                    if (check.perms) details.push(`perms ${check.perms}`);
+                    if (check.content_contains) details.push("contenu attendu");
+                    if (check.content_not_contains) details.push("contenu à exclure");
                     return (
-                      <div key={idx} className="flex items-start space-x-3 p-3 bg-[#03050f]/40 border border-gray-850/50 rounded-xl">
-                        <div className="h-5 w-5 rounded-lg border border-gray-800 bg-gray-950 flex items-center justify-center shrink-0 mt-0.5">
-                          <span className="text-[9px] font-black text-gray-400">{idx + 1}</span>
-                        </div>
-                        <div className="text-xs text-gray-300 leading-relaxed select-text">
-                          <span className="text-white font-semibold">Vérifier `{targetPath}`</span>{isPerm}{isContent}
+                      <div
+                        key={idx}
+                        className="flex items-start gap-2.5 p-2.5 rounded-lg bg-ink-panel/50 border border-ink-line/60"
+                      >
+                        <span className="h-5 w-5 rounded-md border border-ink-line2 bg-ink-deep flex items-center justify-center text-[9px] font-black text-gray-400 shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <div className="text-xs text-gray-300 select-text">
+                          <code className="font-mono text-[11px] text-white">{check.path}</code>
+                          {details.length > 0 && (
+                            <span className="text-gray-500"> — {details.join(" · ")}</span>
+                          )}
                         </div>
                       </div>
                     );
@@ -105,70 +272,50 @@ export default function LevelInstructions({ level }: LevelInstructionsProps) {
                 </div>
               </div>
             )}
+
+            {/* Hints */}
+            {level.hints?.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="section-title text-asta-amber">
+                  <Lightbulb className="h-4 w-4" />
+                  Indices progressifs
+                </h3>
+                <div className="space-y-1.5">
+                  {level.hints.map((hint, idx) => (
+                    <div key={idx} className="p-2.5 rounded-lg bg-asta-amber/5 border border-asta-amber/15 text-[11px] text-gray-300 leading-relaxed select-text">
+                      <span className="font-mono font-bold text-asta-amber mr-1.5">[{idx + 1}]</span>
+                      {hint}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <>
-            {/* Technical Reference Manual / Wiki Support */}
-            <div className="space-y-5 select-text">
-              <div className="space-y-1">
-                <h3 className="text-[11px] font-black uppercase tracking-widest text-white flex items-center space-x-1.5">
-                  <Terminal className="h-4 w-4 text-[#10B981]" />
-                  <span>Manuel de Référence Technique</span>
-                </h3>
-                <p className="text-[10px] text-gray-500 leading-relaxed">Fiches de support technique adaptées aux défis de cette session :</p>
-              </div>
-
-              {/* Guide Item 1: Permissions */}
-              <div className="p-4 bg-gray-950/40 border border-gray-850/50 rounded-xl space-y-2.5">
-                <h4 className="font-bold text-white text-xs flex items-center space-x-1.5">
-                  <ChevronRight className="h-3.5 w-3.5 text-[#10B981]" />
-                  <span>Gestion des Permissions (chmod)</span>
-                </h4>
-                <p className="text-[11px] text-gray-400 leading-relaxed">
-                  En Linux, les permissions régissent les droits d'accès. La commande <code className="text-[#10B981] font-bold">chmod</code> modifie ces droits :
-                </p>
-                <div className="bg-[#03050f] p-2.5 rounded-lg border border-gray-850 font-mono text-[10px] text-gray-300 space-y-1.5">
-                  <p><span className="text-gray-500"># Restreindre l'accès au propriétaire (lecture/écriture)</span></p>
-                  <p><span className="text-emerald-400">chmod 600</span> secret.txt</p>
-                  <p><span className="text-gray-500"># Donner accès complet propriétaire, lecture/exécution aux autres</span></p>
-                  <p><span className="text-emerald-400">chmod 755</span> /var/www/html</p>
-                </div>
-              </div>
-
-              {/* Guide Item 2: Text editing and Echo redirection */}
-              <div className="p-4 bg-gray-950/40 border border-gray-850/50 rounded-xl space-y-2.5">
-                <h4 className="font-bold text-white text-xs flex items-center space-x-1.5">
-                  <ChevronRight className="h-3.5 w-3.5 text-[#10B981]" />
-                  <span>Redirection de Flux et Écriture</span>
-                </h4>
-                <p className="text-[11px] text-gray-400 leading-relaxed">
-                  Pour modifier ou créer un fichier de configuration sans éditeur visuel, vous pouvez utiliser les opérateurs d'écriture :
-                </p>
-                <div className="bg-[#03050f] p-2.5 rounded-lg border border-gray-850 font-mono text-[10px] text-gray-300 space-y-1.5">
-                  <p><span className="text-gray-500"># Écraser ou créer le fichier avec un contenu</span></p>
-                  <p><span className="text-emerald-400">echo "Options -Indexes" &gt;</span> /etc/apache2/apache2.conf</p>
-                  <p><span className="text-gray-500"># Ajouter un contenu à la fin du fichier sans écraser</span></p>
-                  <p><span className="text-emerald-400">echo "AllowOverride None" &gt;&gt;</span> /etc/apache2/apache2.conf</p>
-                </div>
-              </div>
-
-              {/* Guide Item 3: Server Directory Indexing */}
-              <div className="p-4 bg-gray-950/40 border border-gray-850/50 rounded-xl space-y-2.5">
-                <h4 className="font-bold text-white text-xs flex items-center space-x-1.5">
-                  <ChevronRight className="h-3.5 w-3.5 text-[#10B981]" />
-                  <span>Désactiver l'indexation de Dossier</span>
-                </h4>
-                <p className="text-[11px] text-gray-400 leading-relaxed">
-                  L'affichage d'un dossier web par défaut (autoindex) expose la structure des fichiers. Dans Apache, l'indexation se désactive en spécifiant la directive négative suivante :
-                </p>
-                <div className="bg-[#03050f] p-2.5 rounded-lg border border-gray-850 font-mono text-[10px] text-gray-300">
-                  <p className="text-emerald-400">Options -Indexes</p>
-                </div>
-              </div>
+            <div className="space-y-2">
+              <h3 className="section-title text-asta-green">
+                <BookOpen className="h-4 w-4" />
+                Support technique
+              </h3>
+              <p className="text-[11px] text-gray-500 leading-relaxed">
+                Manuel adapté à ce défi. Lis-le avant de te lancer, puis garde-le sous
+                les yeux pendant l'exécution.
+              </p>
+            </div>
+            <div className="p-4 rounded-xl bg-ink-panel/70 border border-ink-line/70 space-y-1 select-text">
+              {renderMarkdown(level.support_technique) ?? (
+                <p className="text-xs text-gray-400">Aucun support fourni pour ce défi.</p>
+              )}
+            </div>
+            <div className="p-3 rounded-xl bg-asta-violet/5 border border-asta-violet/15 text-[11px] text-gray-400 leading-relaxed">
+              <span className="font-bold text-asta-violet">Astuce :</span> le shell est réel. Tu peux utiliser{" "}
+              <code className="text-asta-green font-mono">man</code>,{" "}
+              <code className="text-asta-green font-mono">--help</code> et les tabulations pour explorer les
+              commandes par toi-même.
             </div>
           </>
         )}
-
       </div>
     </div>
   );
