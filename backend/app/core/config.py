@@ -28,15 +28,25 @@ class Settings:
         if origin.strip()
     ]
 
-    # First-run bootstrap admin (zero-config friendly). Disable in production.
+    # PHASE DE TEST — accès ouvert : sans token valide, les requêtes sont
+    # rattachées au compte démo partagé (admin/admin) au lieu d'être rejetées.
+    # Passer à "false" pour rétablir l'authentification SaaS stricte.
+    OPEN_ACCESS: bool = os.getenv("ASTAROTE_OPEN_ACCESS", "true").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+    # First-run bootstrap admin. During the open-access testing phase this is
+    # the shared demo account (admin/admin) used by /api/auth/auto.
     BOOTSTRAP_ADMIN: bool = os.getenv("ASTAROTE_BOOTSTRAP_ADMIN", "true").lower() in (
         "1",
         "true",
         "yes",
     )
     ADMIN_USERNAME: str = os.getenv("ASTAROTE_ADMIN_USERNAME", "admin")
-    ADMIN_PASSWORD: str = os.getenv("ASTAROTE_ADMIN_PASSWORD", "admin123")
-    ADMIN_EMAIL: str = os.getenv("ASTAROTE_ADMIN_EMAIL", "admin@astarote.local")
+    ADMIN_PASSWORD: str = os.getenv("ASTAROTE_ADMIN_PASSWORD", "admin")
+    ADMIN_EMAIL: str = os.getenv("ASTAROTE_ADMIN_EMAIL", "admin@astarote.dev")
 
 
 settings = Settings()

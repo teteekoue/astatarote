@@ -98,6 +98,23 @@ base de règles pédagogiques) ou avec le fournisseur LLM configuré par l'utili
 
 ## 🔧 Installation & lancement
 
+### 🧪 Phase actuelle : accès ouvert (test)
+
+Tant que la plateforme est en phase de test, **aucun compte n'est nécessaire** :
+- au chargement, l'app obtient automatiquement une session sur le compte démo
+  partagé **admin / admin** (`POST /api/auth/auto`) ;
+- en prime, `ASTAROTE_OPEN_ACCESS=true` fait en sorte que toute requête **sans
+  token valide** (proxy, iframe, stockage bloqué…) soit rattachée à ce compte
+  démo plutôt que rejetée — impossible de se retrouver enfermé dehors ;
+- l'écran de connexion, l'inscription et la gestion de compte sont retirés de
+  l'interface (les composants `Landing.tsx` / `AuthPage.tsx` / `Profile.tsx` /
+  `Settings.tsx` sont conservés pour la réactivation).
+
+Pour repasser en **SaaS multi-utilisateurs** :
+1. `ASTAROTE_BOOTSTRAP_ADMIN=false` et `ASTAROTE_OPEN_ACCESS=false` ;
+2. dans `frontend/src/App.tsx`, retirer l'appel à `/api/auth/auto` et remettre
+   les vues landing/auth + la navigation Profil/Paramètres.
+
 ### Déploiement SaaS (production)
 
 ```bash

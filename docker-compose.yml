@@ -15,7 +15,11 @@ services:
       # À SURCHARGER EN PRODUCTION (docker compose override ou .env) :
       - ASTAROTE_SECRET_KEY=${ASTAROTE_SECRET_KEY:-asta-change-me-in-production}
       - ASTAROTE_TOKEN_EXPIRE_MINUTES=${ASTAROTE_TOKEN_EXPIRE_MINUTES:-1440}
-      - ASTAROTE_BOOTSTRAP_ADMIN=${ASTAROTE_BOOTSTRAP_ADMIN:-false}
+      # PHASE DE TEST — accès ouvert (compte démo partagé admin/admin, pas
+      # d'écran de connexion). Passer à "false" et réactiver l'auth SaaS
+      # dans le frontend avant l'ouverture publique.
+      - ASTAROTE_BOOTSTRAP_ADMIN=${ASTAROTE_BOOTSTRAP_ADMIN:-true}
+      - ASTAROTE_OPEN_ACCESS=${ASTAROTE_OPEN_ACCESS:-true}
       - ASTAROTE_CORS_ORIGINS=${ASTAROTE_CORS_ORIGINS:-http://localhost:8000}
     volumes:
       - db_data:/data

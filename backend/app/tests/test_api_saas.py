@@ -14,6 +14,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_TMP_DB}"
 from fastapi.testclient import TestClient  # noqa: E402
 
 from backend.app.main import app  # noqa: E402
+from backend.app.core.config import settings  # noqa: E402
 from backend.app.core.database.session import Base, engine, SessionLocal  # noqa: E402
 from backend.app.models.models import Game, GameState, Level, User  # noqa: E402
 
@@ -21,6 +22,16 @@ Base.metadata.create_all(bind=engine)
 
 
 class TestSaasFlow(unittest.TestCase):
+    """Strict multi-user SaaS behaviour (OPEN_ACCESS disabled)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._previous = settings.OPEN_ACCESS
+        settings.OPEN_ACCESS = False
+
+    @classmethod
+    def tearDownClass(cls):
+        settings.OPEN_ACCESS = cls._previous
     def setUp(self):
         self.client = TestClient(app)
         self.suffix = os.urandom(4).hex()
@@ -157,6 +168,48 @@ class TestSaasFlow(unittest.TestCase):
 
         r = self.client.get(f"/api/games/{game['id']}/levels", headers=auth2)
         self.assertEqual(r.status_code, 404)
+
+
+class TestOpenAccessMode(unittest.TestCase):
+    """Open-access testing phase: tokenless requests map to the demo admin."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._previous = settings.OPEN_ACCESS
+        settings.OPEN_ACCESS = True
+
+    @classmethod
+    def tearDownClass(cls):
+        settings.OPEN_ACCESS = cls._previous
+
+    def test_tokenless_requests_map_to_demo_admin(self):
+        client = TestClient(app)
+        r = client.get("/api/users/me")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["username"], settings.ADMIN_USERNAME)
+
+    def test_invalid_token_falls_back_instead_of_401(self):
+        client = TestClient(app)
+        r = client.get("/api/users/me", headers={"Authorization": "Bearer garbage"})
+        self.assertEqual(r.status_code, 200)
+
+    def test_full_game_flow_without_any_token(self):
+        client = TestClient(app)
+        r = client.post("/api/games", json={"catalog_slug": "linux-essentials"})
+        self.assertEqual(r.status_code, 200)
+        game_id = r.json()["id"]
+
+        with client.websocket_connect(f"/ws/terminal/{game_id}?level=0") as ws:
+            ws.receive_json()  # banner
+            ws.receive_json()  # prompt
+            for cmd in ("pwd", "ls"):
+                ws.send_json({"type": "input", "line": cmd})
+                ws.receive_json()  # output
+                ws.receive_json()  # prompt
+
+        r = client.post(f"/api/games/{game_id}/levels/0/validate")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["success"], r.text)
 
 
 if __name__ == "__main__":

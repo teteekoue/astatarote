@@ -23,20 +23,14 @@ from backend.app.core.database.session import SessionLocal
 from backend.app.core.terminal.engine import session as engine_sessions
 from backend.app.core.terminal.engine.session import banner
 from backend.app.models.models import Game, GameState, Level, User
-from backend.app.api.routes.auth import decode_token
+from backend.app.api.routes.auth import resolve_user_from_token
 
 logger = logging.getLogger("astarote.websockets.terminal")
 router = APIRouter()
 
 
 def _resolve_user(db: Session, websocket: WebSocket) -> User | None:
-    token = websocket.query_params.get("token")
-    if not token:
-        return None
-    username = decode_token(token)
-    if not username:
-        return None
-    return db.query(User).filter(User.username == username).first()
+    return resolve_user_from_token(websocket.query_params.get("token"), db)
 
 
 @router.websocket("/ws/terminal/{game_id}")

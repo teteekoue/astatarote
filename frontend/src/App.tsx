@@ -3,23 +3,17 @@ import {
   LayoutDashboard,
   Compass,
   BarChart3,
-  Award,
-  Settings as SettingsIcon,
   Menu,
   X,
-  LogOut,
   ShieldCheck,
-  Gamepad2,
+  FlaskConical,
+  AlertTriangle,
 } from "lucide-react";
-import Landing from "./components/Landing";
-import AuthPage from "./components/Auth/AuthPage";
 import Dashboard from "./components/Dashboard/Dashboard";
 import Catalog from "./components/Dashboard/Catalog";
 import GameInterface from "./components/Game/GameInterface";
-import Settings from "./components/Settings/Settings";
-import Profile from "./components/Profile/Profile";
 import StatsPage from "./components/Dashboard/StatsPage";
-import { api } from "./lib/api";
+import { api, ApiError } from "./lib/api";
 import {
   getStoredUser,
   setStoredUser,
@@ -31,34 +25,58 @@ import {
 
 export type { UserType };
 
-type Page = "dashboard" | "catalog" | "stats" | "profile" | "settings" | "game";
+type Page = "dashboard" | "catalog" | "stats" | "game";
 
+/**
+ * PHASE DE TEST — ACCÈS OUVERT
+ * ----------------------------
+ * Pas d'écran de connexion ni de gestion de compte : au chargement, la app
+ * obtient automatiquement une session sur le compte démo partagé
+ * (admin / admin) via POST /api/auth/auto.
+ *
+ * Pour réactiver le flux SaaS complet plus tard : remettre les vues
+ * "landing" / "auth" (components/Landing.tsx et Auth/AuthPage.tsx sont
+ * conservés), la nav Profil/Paramètres et l'inscription/connexion.
+ */
 export default function App() {
   const [user, setUser] = useState<UserType | null>(getStoredUser());
-  const [view, setView] = useState<"landing" | "auth" | "app">(
-    isAuthenticated() ? "app" : "landing"
-  );
   const [activePage, setActivePage] = useState<Page>("dashboard");
   const [selectedGame, setSelectedGame] = useState<{ id: number; name: string } | null>(null);
-  const [loading, setLoading] = useState<boolean>(isAuthenticated());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   /* ------------------------- Session bootstrap ------------------------- */
   const bootstrap = useCallback(async () => {
-    if (!isAuthenticated()) {
-      setLoading(false);
-      return;
-    }
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const data = await api.get<UserType>("/api/users/me");
-      setStoredUser(data);
-      setUser(data);
-      setView("app");
-    } catch {
+      if (isAuthenticated()) {
+        try {
+          const data = await api.get<UserType>("/api/users/me");
+          setStoredUser(data);
+          setUser(data);
+          return;
+        } catch (err) {
+          if (!(err instanceof ApiError && err.status === 401)) throw err;
+          clearSession(); // token expiré → nouvelle session auto
+        }
+      }
+      // Accès ouvert : session sur le compte démo partagé (admin/admin)
+      const data = await api.post<{ access_token: string; user: UserType }>(
+        "/api/auth/auto"
+      );
+      setToken(data.access_token);
+      setStoredUser(data.user);
+      setUser(data.user);
+    } catch (err) {
       clearSession();
       setUser(null);
-      setView("landing");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossible de démarrer une session sur le serveur."
+      );
     } finally {
       setLoading(false);
     }
@@ -70,32 +88,12 @@ export default function App() {
 
   useEffect(() => {
     const onUnauthorized = () => {
-      clearSession();
-      setUser(null);
-      setSelectedGame(null);
-      setActivePage("dashboard");
-      setView("landing");
+      // Session expirée en cours de route → renouvellement silencieux.
+      bootstrap();
     };
     window.addEventListener("astarote:unauthorized", onUnauthorized);
     return () => window.removeEventListener("astarote:unauthorized", onUnauthorized);
-  }, []);
-
-  const handleLogout = () => {
-    clearSession();
-    setUser(null);
-    setSelectedGame(null);
-    setActivePage("dashboard");
-    setView("landing");
-  };
-
-  const enterApp = () => {
-    if (isAuthenticated()) {
-      setView("app");
-      bootstrap();
-    } else {
-      setView("auth");
-    }
-  };
+  }, [bootstrap]);
 
   const playGame = (gameId: number, gameName: string) => {
     setSelectedGame({ id: gameId, name: gameName });
@@ -104,38 +102,34 @@ export default function App() {
 
   /* ------------------------------ Screens ------------------------------ */
 
-  if (loading && view === "app") {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
         <div className="text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           <p className="mt-4 font-mono text-[11px] uppercase tracking-widest text-muted">
-            Chargement de votre espace…
+            Démarrage du laboratoire…
           </p>
         </div>
       </div>
     );
   }
 
-  if (view === "landing") {
-    return <Landing onEnter={enterApp} />;
-  }
-
-  if (view === "auth") {
-    return (
-      <AuthPage
-        onBack={() => setView("landing")}
-        onSuccess={(u) => {
-          setUser(u);
-          setView("app");
-          setActivePage("dashboard");
-        }}
-      />
-    );
-  }
-
   if (!user) {
-    return <Landing onEnter={enterApp} />;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+        <div className="card max-w-md p-8 text-center">
+          <AlertTriangle className="mx-auto h-8 w-8 text-warning" />
+          <p className="mt-3 font-mono text-[12px] font-bold uppercase tracking-widest text-warning">
+            Serveur injoignable
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">{error}</p>
+          <button onClick={bootstrap} className="btn-primary mt-6 w-full">
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (activePage === "game" && selectedGame) {
@@ -158,8 +152,6 @@ export default function App() {
     { id: "dashboard" as Page, label: "Mes parcours", icon: LayoutDashboard },
     { id: "catalog" as Page, label: "Catalogue", icon: Compass },
     { id: "stats" as Page, label: "Progression", icon: BarChart3 },
-    { id: "profile" as Page, label: "Profil", icon: Award },
-    { id: "settings" as Page, label: "Paramètres", icon: SettingsIcon },
   ];
 
   return (
@@ -215,7 +207,7 @@ export default function App() {
                   }`}
                 >
                   {isActive && (
-                    <span className="absolute left-0 top-1/4 bottom-1/4 w-1 rounded-r-full bg-primary" />
+                    <span className="absolute bottom-1/4 left-0 top-1/4 w-1 rounded-r-full bg-primary" />
                   )}
                   <Icon className={`h-[18px] w-[18px] ${isActive ? "text-primary" : ""}`} />
                   {item.label}
@@ -225,13 +217,11 @@ export default function App() {
           </nav>
         </div>
 
-        {/* User footer */}
+        {/* Footer — session info (open-access test mode) */}
         <div className="border-t border-border/70 p-4">
-          <div className="mb-3 flex items-center gap-3 px-1">
+          <div className="flex items-center gap-3 px-1">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-gradient-to-br from-primary/20 to-accent/10">
-              <span className="font-mono text-[12px] font-bold text-primary">
-                {user.username.slice(0, 2).toUpperCase()}
-              </span>
+              <span className="font-mono text-[12px] font-bold text-primary">AD</span>
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-semibold">{user.username}</p>
@@ -240,13 +230,12 @@ export default function App() {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg py-2 text-[12px] font-semibold text-muted transition-all duration-200 hover:bg-danger/10 hover:text-danger"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Déconnexion
-          </button>
+          <div className="mt-3 flex items-center justify-center gap-1.5 rounded-lg border border-warning/25 bg-warning/8 px-2 py-1.5">
+            <FlaskConical className="h-3 w-3 text-warning" />
+            <span className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-warning">
+              Mode test · accès ouvert
+            </span>
+          </div>
         </div>
       </aside>
 
@@ -261,28 +250,14 @@ export default function App() {
       {/* Main */}
       <main className="min-h-screen flex-1 overflow-x-hidden">
         {activePage === "dashboard" && (
-          <Dashboard user={user} onPlayGame={playGame} onBrowseCatalog={() => setActivePage("catalog")} />
+          <Dashboard
+            user={user}
+            onPlayGame={playGame}
+            onBrowseCatalog={() => setActivePage("catalog")}
+          />
         )}
         {activePage === "catalog" && <Catalog onPlayGame={playGame} />}
         {activePage === "stats" && <StatsPage user={user} />}
-        {activePage === "profile" && (
-          <Profile
-            user={user}
-            onUserUpdate={(u) => {
-              setUser(u);
-              setStoredUser(u);
-            }}
-          />
-        )}
-        {activePage === "settings" && (
-          <Settings
-            user={user}
-            onUserUpdate={(u) => {
-              setUser(u);
-              setStoredUser(u);
-            }}
-          />
-        )}
       </main>
     </div>
   );
