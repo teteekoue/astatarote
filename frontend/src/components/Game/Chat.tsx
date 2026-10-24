@@ -35,8 +35,11 @@ export default function Chat({ gameId, levelIndex }: ChatProps) {
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.sender === "user") return; // our own messages are already displayed
-          setMessages((prev) => [...prev, msg as ChatMessage]);
+          if (msg.sender === "ai" || msg.sender === "user") {
+            // Live replies are always "ai"; replayed history includes both
+            // sides (the user's live messages are added optimistically).
+            setMessages((prev) => [...prev, msg as ChatMessage]);
+          }
         } catch {
           /* ignore */
         } finally {
