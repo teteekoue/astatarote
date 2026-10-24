@@ -1,5 +1,11 @@
 import os
 
+from dotenv import load_dotenv
+
+# Load the project .env when present (local dev); in production the
+# environment is provided by the container / orchestrator.
+load_dotenv()
+
 
 class Settings:
     """Central application settings, configurable through environment variables."""
