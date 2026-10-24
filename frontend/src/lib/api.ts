@@ -54,5 +54,44 @@ export function wsUrl(path: string): string {
   if (window.location.port === "3000") {
     host = window.location.hostname + ":8000";
   }
-  return `${protocol}//${host}${path}`;
+  const token = getToken();
+  const sep = path.includes("?") ? "&" : "?";
+  return `${protocol}//${host}${path}${sep}token=${encodeURIComponent(token ?? "")}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared domain types                                                */
+/* ------------------------------------------------------------------ */
+
+export interface CatalogGame {
+  slug: string;
+  name: string;
+  tagline: string;
+  description: string;
+  domain: string;
+  level: string;
+  difficulty: number;
+  duration_minutes: number;
+  skills: string[];
+  version: string;
+  total_levels: number;
+  total_points: number;
+  enrolled: boolean;
+  enrollment: GameSummary | null;
+}
+
+export interface GameSummary {
+  id: number;
+  user_id: number;
+  catalog_slug: string | null;
+  name: string;
+  description: string | null;
+  domain: string;
+  level: string;
+  status: string;
+  current_level_index: number;
+  total_levels: number;
+  progress: number;
+  created_at: string;
+  updated_at: string;
 }

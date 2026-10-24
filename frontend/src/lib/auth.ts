@@ -16,7 +16,6 @@ export interface UserPreferences {
   api_key: string;
   theme: string;
   font_size: number;
-  terminal_type: string;
 }
 
 export interface UserType {

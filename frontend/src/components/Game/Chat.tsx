@@ -1,182 +1,147 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Send, Bot, User, Sparkles, Lightbulb, SearchCheck, Wifi, WifiOff } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Bot, SendHorizonal, Sparkles, Loader2 } from "lucide-react";
 import { wsUrl } from "../../lib/api";
+import Markdown from "../Markdown";
 
 interface ChatProps {
   gameId: number;
+  levelIndex: number;
 }
 
-interface MessageType {
-  sender: string;
+interface ChatMessage {
+  sender: "user" | "ai";
   message: string;
-  timestamp?: string;
+  timestamp: string;
 }
 
-const SUGGESTIONS = [
-  { key: "hint", label: "Un indice ?", icon: Lightbulb },
-  { key: "concept", label: "Explique un concept", icon: Sparkles },
-  { key: "check", label: "Vérifie mon travail", icon: SearchCheck },
-];
-
-export default function Chat({ gameId }: ChatProps) {
-  const [messages, setMessages] = useState<MessageType[]>([]);
-  const [inputText, setInputText] = useState("");
+export default function Chat({ gameId, levelIndex }: ChatProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
   const [connected, setConnected] = useState(false);
-  const [typing, setTyping] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
+  const [thinking, setThinking] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocket(wsUrl(`/ws/chat/${gameId}`));
-    wsRef.current = ws;
+    setMessages([]);
+    let manuallyClosed = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-    ws.onopen = () => setConnected(true);
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.sender) {
-          setMessages((prev) => {
-            if (prev.some((m) => m.message === data.message && m.sender === data.sender)) return prev;
-            return [...prev, data];
-          });
-          setTyping(false);
+    const connect = () => {
+      const ws = new WebSocket(wsUrl(`/ws/chat/${gameId}?level=${levelIndex}`));
+      wsRef.current = ws;
+
+      ws.onopen = () => setConnected(true);
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.sender === "user") return; // our own messages are already displayed
+          setMessages((prev) => [...prev, msg as ChatMessage]);
+        } catch {
+          /* ignore */
+        } finally {
+          setThinking(false);
         }
-      } catch {
-        /* ignore */
-      }
+      };
+      ws.onclose = () => {
+        setConnected(false);
+        if (!manuallyClosed) reconnectTimer = setTimeout(connect, 2000);
+      };
     };
-    ws.onclose = () => setConnected(false);
-    ws.onerror = () => setConnected(false);
+    connect();
 
     return () => {
-      ws.close();
-      wsRef.current = null;
+      manuallyClosed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      wsRef.current?.close();
     };
-  }, [gameId]);
+  }, [gameId, levelIndex]);
 
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typing]);
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, thinking]);
 
-  const handleSend = (textToSend?: string) => {
-    const message = (textToSend ?? inputText).trim();
-    if (!message || !wsRef.current) return;
-
-    setMessages((prev) => [...prev, { sender: "user", message }]);
-    wsRef.current.send(JSON.stringify({ message }));
-    if (!textToSend) setInputText("");
-    setTyping(true);
-  };
-
-  const handleSuggestion = (key: string) => {
-    if (key === "hint") handleSend("Je suis bloqué, donne-moi un indice progressif sans la solution.");
-    if (key === "concept") handleSend("Explique-moi le concept clé de ce défi.");
-    if (key === "check") handleSend("Vérifie ma démarche : je viens d'exécuter des commandes, dis-moi si je suis sur la bonne voie.");
+  const send = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || !connected) return;
+    setMessages((prev) => [
+      ...prev,
+      { sender: "user", message: text, timestamp: new Date().toISOString() },
+    ]);
+    wsRef.current?.send(JSON.stringify({ message: text }));
+    setInput("");
+    setThinking(true);
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-ink-deep/60 relative select-none">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-ink-line bg-ink-panel/70 flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-asta-green/10 border border-asta-green/30 flex items-center justify-center">
-            <Bot className="h-4.5 w-4.5 text-asta-green" />
-          </div>
-          <div>
-            <p className="font-mono text-xs font-black text-white tracking-wide">NEMESIS</p>
-            <p className="text-[8px] text-asta-green font-mono tracking-widest uppercase font-bold">
-              Coéquipier IA pédagogique
-            </p>
-          </div>
+      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+        <div className="relative flex h-8 w-8 items-center justify-center rounded-xl border border-primary/30 bg-primary/10">
+          <Bot className="h-4 w-4 text-primary" />
+          {connected && (
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-accent" />
+          )}
         </div>
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`h-2 w-2 rounded-full ${
-              connected ? "bg-asta-green animate-pulse-glow" : "bg-red-500"
-            }`}
-          ></span>
-          {connected ? <Wifi className="h-3 w-3 text-asta-green" /> : <WifiOff className="h-3 w-3 text-red-500" />}
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="text-[13px] font-semibold">Nemesis</p>
+          <p className="truncate text-[11px] text-muted">
+            {connected ? "assistante pédagogique · en ligne" : "reconnexion…"}
+          </p>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg, index) => {
-          const isAI = msg.sender === "ai";
-          return (
-            <div key={index} className={`flex ${isAI ? "justify-start" : "justify-end"} animate-fade-in`}>
-              <div
-                className={`max-w-[90%] rounded-2xl p-3.5 text-xs leading-relaxed font-mono border shadow-sm ${
-                  isAI
-                    ? "bg-ink-panel/80 text-gray-300 border-ink-line/80"
-                    : "bg-asta-green/10 text-gray-100 border-asta-green/20"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-2 text-[8px] font-black uppercase tracking-wider text-gray-500 border-b border-ink-line/40 pb-1.5">
-                  {isAI ? (
-                    <>
-                      <Bot className="h-3 w-3 text-asta-green" />
-                      <span className="text-asta-green font-black">NEMESIS</span>
-                    </>
-                  ) : (
-                    <>
-                      <User className="h-3 w-3 text-gray-400" />
-                      <span>Vous</span>
-                    </>
-                  )}
-                </div>
-                <p className="whitespace-pre-wrap break-words leading-relaxed select-text text-[11px]">{msg.message}</p>
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        {messages.map((msg, i) =>
+          msg.sender === "user" ? (
+            <div key={i} className="flex justify-end">
+              <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-sm leading-relaxed text-white">
+                {msg.message}
               </div>
             </div>
-          );
-        })}
-
-        {typing && (
-          <div className="flex justify-start">
-            <div className="bg-ink-panel/80 border border-ink-line/80 rounded-2xl p-4 text-xs text-gray-400 font-mono shadow-sm flex items-center gap-2">
-              <span className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Nemesis écrit</span>
-              <div className="flex gap-1">
-                <span className="h-1.5 w-1.5 bg-asta-green rounded-full animate-bounce"></span>
-                <span className="h-1.5 w-1.5 bg-asta-green rounded-full animate-bounce [animation-delay:0.15s]"></span>
-                <span className="h-1.5 w-1.5 bg-asta-green rounded-full animate-bounce [animation-delay:0.3s]"></span>
+          ) : (
+            <div key={i} className="flex justify-start">
+              <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-border bg-surface-2/60 px-3.5 py-2.5">
+                <Markdown text={msg.message} />
               </div>
             </div>
+          )
+        )}
+        {thinking && (
+          <div className="flex items-center gap-2 px-2 text-muted">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span className="text-[12px]">Nemesis réfléchit…</span>
           </div>
         )}
-        <div ref={scrollRef} />
       </div>
 
-      {/* Suggestions */}
-      <div className="px-3 py-2 border-t border-ink-line/50 bg-ink-panel/40 flex flex-wrap gap-1.5 shrink-0">
-        {SUGGESTIONS.map(({ key, label, icon: Icon }) => (
+      {/* Composer */}
+      <form onSubmit={send} className="border-t border-border p-3">
+        <div className="flex items-end gap-2">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Posez votre question à Nemesis…"
+            className="input py-2 text-[13px]"
+            aria-label="Message à l'assistante Nemesis"
+            maxLength={500}
+          />
           <button
-            key={key}
-            onClick={() => handleSuggestion(key)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-ink-deep/60 hover:bg-asta-green/10 text-[10px] font-bold font-mono text-gray-400 hover:text-white rounded-lg border border-ink-line hover:border-asta-green/40 transition-all duration-200"
+            type="submit"
+            disabled={!input.trim() || !connected}
+            className="btn-primary h-[38px] w-[42px] shrink-0 !p-0"
+            aria-label="Envoyer"
           >
-            <Icon className="h-3 w-3 text-asta-green" />
-            {label}
+            <SendHorizonal className="h-4 w-4" />
           </button>
-        ))}
-      </div>
-
-      {/* Input */}
-      <div className="p-3 border-t border-ink-line/60 bg-ink-panel/70 flex gap-2 shrink-0">
-        <input
-          type="text"
-          placeholder="Pose ta question à Nemesis..."
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          className="flex-1 bg-ink-deep/70 border border-ink-line rounded-xl px-3.5 py-2.5 text-xs font-mono select-text outline-none focus:border-asta-green/50 transition"
-        />
-        <button
-          onClick={() => handleSend()}
-          className="p-2.5 bg-asta-green/10 hover:bg-asta-green hover:text-black border border-asta-green/25 rounded-xl text-asta-green transition-all duration-300"
-        >
-          <Send className="h-4 w-4" />
-        </button>
-      </div>
+        </div>
+        <p className="mt-2 flex items-center gap-1.5 px-1 text-[11px] text-muted">
+          <Sparkles className="h-3 w-3 text-primary" />
+          Elle explique et oriente, mais ne donne jamais la solution brute.
+        </p>
+      </form>
     </div>
   );
 }

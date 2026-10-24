@@ -32,7 +32,5 @@ class Settings:
     ADMIN_PASSWORD: str = os.getenv("ASTAROTE_ADMIN_PASSWORD", "admin123")
     ADMIN_EMAIL: str = os.getenv("ASTAROTE_ADMIN_EMAIL", "admin@astarote.local")
 
-    SANDBOX_BASE: str = os.getenv("ASTAROTE_SANDBOX_BASE", "/tmp/astarote")
-
 
 settings = Settings()

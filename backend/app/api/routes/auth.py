@@ -120,6 +120,23 @@ def get_current_user(
     return user
 
 
+def get_optional_user(
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """Like get_current_user but returns None instead of raising 401.
+
+    Used for public endpoints (e.g. the catalog shown on the landing page)
+    that get richer when the visitor is authenticated.
+    """
+    if not token:
+        return None
+    username = decode_token(token)
+    if not username:
+        return None
+    return db.query(User).filter(User.username == username).first()
+
+
 @router.post("/register", response_model=UserResponse)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == user_in.username).first()

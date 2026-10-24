@@ -1,17 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 
 logger = logging.getLogger("astarote.api.games")
 
-from backend.app.core.config import settings
 from backend.app.core.database.session import get_db
-from backend.app.core.terminal.sandbox import SandboxManager
+from backend.app.catalog import list_games, get_game
 from backend.app.models.models import Game, Level, GameState, User
 from backend.app.schemas.schemas import (
-    GameCreate,
+    GameStart,
     GameResponse,
     LevelResponse,
     ValidateResponse,
@@ -19,14 +17,18 @@ from backend.app.schemas.schemas import (
     UserPreferences,
     UserUpdate,
     UserPasswordUpdate,
+    CatalogGameResponse,
 )
-from backend.app.api.routes.auth import get_current_user, verify_password, get_password_hash
-from backend.app.core.ai.service import AIService
+from backend.app.api.routes.auth import (
+    get_current_user,
+    get_optional_user,
+    verify_password,
+    get_password_hash,
+)
 from backend.app.core.game.engine import GameEngine
+from backend.app.core.terminal.engine import session as engine_sessions
 
 router = APIRouter(tags=["games"])
-
-TOTAL_LEVELS = 3
 
 
 def _get_owned_game(db: Session, game_id: int, user: User) -> Game:
@@ -113,7 +115,33 @@ def update_preferences(
 
 
 # ---------------------------------------------------------------------------
-# Game management routes
+# Catalog routes (frozen, hand-crafted courses)
+# ---------------------------------------------------------------------------
+
+@router.get("/catalog", response_model=List[CatalogGameResponse])
+def get_catalog(
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db),
+):
+    """List the frozen course catalog, annotated with the user's enrollments."""
+    enrollments = {}
+    if current_user:
+        for game in db.query(Game).filter(Game.user_id == current_user.id).all():
+            enrollments[game.catalog_slug] = game
+
+    result = []
+    for meta in list_games():
+        enrollment = enrollments.get(meta["slug"])
+        result.append(CatalogGameResponse(
+            **meta,
+            enrolled=enrollment is not None,
+            enrollment=GameResponse.model_validate(enrollment) if enrollment else None,
+        ))
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Game (enrollment) management routes
 # ---------------------------------------------------------------------------
 
 @router.get("/games", response_model=List[GameResponse])
@@ -130,78 +158,72 @@ def get_games(
 
 
 @router.post("/games", response_model=GameResponse)
-def create_game(
-    game_in: GameCreate,
+def start_game(
+    game_in: GameStart,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # The AI creates every level entirely itself (scenario, files, mission,
-    # support, validation) from the user's goal. Generate all levels first so
-    # we never create a game if the AI cannot produce them.
-    raw_levels: Dict[int, Dict[str, Any]] = {}
-    errors: List[str] = []
+    """Instantiate a user's run of a frozen catalog course.
 
-    with ThreadPoolExecutor(max_workers=TOTAL_LEVELS) as pool:
-        futures = {
-            pool.submit(
-                AIService.generate_level,
-                domain=game_in.domain,
-                user_level=game_in.level,
-                level_index=idx,
-                custom_prompt=game_in.custom_prompt,
-                preferences=current_user.preferences or {},
-            ): idx
-            for idx in range(TOTAL_LEVELS)
-        }
-        try:
-            for fut in as_completed(futures, timeout=90.0):
-                idx = futures[fut]
-                try:
-                    raw_levels[idx] = fut.result()
-                except Exception as e:
-                    errors.append(f"Niveau {idx + 1} : {e}")
-        except TimeoutError:
-            errors.append("La génération IA a dépassé le délai (90 s).")
+    No AI is involved: levels are copied verbatim from the hand-crafted
+    catalog definition into the user's own progress rows.
+    """
+    catalog_game = get_game(game_in.catalog_slug)
+    if not catalog_game:
+        raise HTTPException(status_code=404, detail="Parcours introuvable dans le catalogue.")
 
-    if errors:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="La génération IA des niveaux a échoué : " + " ; ".join(errors),
+    # Idempotent enrollment: resume an existing run instead of duplicating.
+    existing = (
+        db.query(Game)
+        .filter(
+            Game.user_id == current_user.id,
+            Game.catalog_slug == catalog_game["slug"],
+            Game.status == "active",
         )
+        .first()
+    )
+    if existing:
+        return existing
 
     game = Game(
         user_id=current_user.id,
-        name=game_in.name,
-        description=game_in.description
-        or f"Apprendre {game_in.domain} ({game_in.level})",
-        domain=game_in.domain,
-        level=game_in.level,
+        catalog_slug=catalog_game["slug"],
+        catalog_version=catalog_game["version"],
+        name=catalog_game["name"],
+        description=catalog_game["description"],
+        domain=catalog_game["domain"],
+        level=catalog_game["level"],
         status="active",
         current_level_index=0,
-        total_levels=TOTAL_LEVELS,
+        total_levels=len(catalog_game["levels"]),
         progress=0.0,
     )
     db.add(game)
     db.commit()
     db.refresh(game)
 
-    for idx in range(TOTAL_LEVELS):
-        raw_level = raw_levels[idx]
-
+    for idx, level_data in enumerate(catalog_game["levels"]):
         level = Level(
             game_id=game.id,
             level_index=idx,
-            title=raw_level.get("title", f"Défi {idx + 1}"),
-            description=raw_level.get("situation_probleme") or raw_level.get("description", ""),
-            objective=raw_level.get("objective", ""),
-            situation_probleme=raw_level.get("situation_probleme"),
-            consigne=raw_level.get("consigne"),
-            support_technique=raw_level.get("support_technique"),
-            scenario=raw_level.get("scenario", {}),
-            hints=raw_level.get("hints", []),
-            difficulty=raw_level.get("difficulty", 3),
-            points=raw_level.get("points", 100),
-            time_limit=raw_level.get("time_limit", 600),
+            title=level_data["title"],
+            description=level_data.get("situation_probleme", ""),
+            objective=level_data["objective"],
+            situation_probleme=level_data.get("situation_probleme"),
+            consigne="\n".join(f"- {step}" for step in level_data.get("consigne", []))
+            if isinstance(level_data.get("consigne"), list)
+            else level_data.get("consigne"),
+            support_technique=level_data.get("support_technique"),
+            scenario={
+                "initial_state": level_data["scenario"].get("initial_state", {}),
+                "responses": level_data["scenario"].get("responses", []),
+                "forbidden_commands": level_data["scenario"].get("forbidden_commands", []),
+                "expected_state": level_data.get("expected_state", {}),
+            },
+            hints=level_data.get("hints", []),
+            difficulty=level_data.get("difficulty", 3),
+            points=level_data.get("points", 100),
+            time_limit=level_data.get("time_limit", 600),
             status="available" if idx == 0 else "locked",
         )
         db.add(level)
@@ -211,10 +233,7 @@ def create_game(
         game_state = GameState(
             game_id=game.id,
             level_id=level.id,
-            terminal_state={
-                "level_index": idx,
-                "sandbox_dir": SandboxManager.sandbox_dir(game.id, level.id),
-            },
+            terminal_state={},
             chat_history=[],
             memory_summary="{}",
         )
@@ -276,7 +295,7 @@ def reset_game_level(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Recreates the level sandbox from scratch (processes killed, files restored)."""
+    """Recreate the level's virtual machine from its frozen scenario."""
     _get_owned_game(db, game_id, current_user)
     level = (
         db.query(Level)
@@ -286,10 +305,21 @@ def reset_game_level(
     if not level:
         raise HTTPException(status_code=404, detail="Niveau introuvable")
 
-    SandboxManager.prepare(game_id, level.id, level.scenario)
+    # Fresh deterministic session from the initial scenario.
+    engine_sessions.reset_session(game_id, level.id, level.scenario)
+    state = (
+        db.query(GameState)
+        .filter(GameState.game_id == game_id, GameState.level_id == level.id)
+        .first()
+    )
+    shell = engine_sessions.get_session(game_id, level.id, level.scenario)
+    if state:
+        state.terminal_state = engine_sessions.persist(shell)
+    db.commit()
+
     return {
         "success": True,
-        "message": "Sandbox du niveau réinitialisée. L'environnement a été restauré à son état initial.",
+        "message": "Environnement virtuel réinitialisé — l'état de départ est restauré.",
         "points_earned": 0,
     }
 
@@ -301,7 +331,11 @@ def delete_game(
     db: Session = Depends(get_db),
 ):
     game = _get_owned_game(db, game_id, current_user)
-    SandboxManager.cleanup(game_id, 0)
+
+    # Drop every cached virtual machine for this game.
+    for level in db.query(Level).filter(Level.game_id == game_id).all():
+        engine_sessions.drop_session(game_id, level.id)
+
     db.delete(game)
     db.commit()
     return {

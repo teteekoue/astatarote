@@ -85,17 +85,15 @@ class TokenData(BaseModel):
 # Game Schemas
 # ---------------------------------------------------------------
 
-class GameCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
-    description: Optional[str] = ""
-    domain: str = "linux"  # linux, network, security
-    level: str = "beginner"  # beginner, intermediate, advanced
-    custom_prompt: Optional[str] = None
+class GameStart(BaseModel):
+    """Start (enroll into) a frozen catalog course."""
+    catalog_slug: str = Field(min_length=1, max_length=80)
 
 
 class GameResponse(BaseModel):
     id: int
     user_id: int
+    catalog_slug: Optional[str] = None
     name: str
     description: Optional[str]
     domain: str
@@ -109,6 +107,23 @@ class GameResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CatalogGameResponse(BaseModel):
+    slug: str
+    name: str
+    tagline: str
+    description: str
+    domain: str
+    level: str
+    difficulty: int
+    duration_minutes: int
+    skills: List[str]
+    version: str
+    total_levels: int
+    total_points: int
+    enrolled: bool = False
+    enrollment: Optional[GameResponse] = None
 
 
 # ---------------------------------------------------------------

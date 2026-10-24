@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Databases (runtime data — never commit user data on a SaaS)
+*.db
+*.sqlite3
+
+# Build artifacts
+*.deb
+dist-*/
+frontend/dist/
+
+# Environment & secrets
+.env.local
+.env.production
+
+# OS
+.DS_Store
+node_modules/
