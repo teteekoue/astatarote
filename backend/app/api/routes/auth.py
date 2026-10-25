@@ -98,26 +98,62 @@ def create_default_user_if_not_exists(db: Session) -> Optional[User]:
     return user
 
 
+def get_or_create_demo_admin(db: Session) -> Optional[User]:
+    """The shared demo account used during the open-access testing phase."""
+    admin = create_default_user_if_not_exists(db)
+    if admin is None:
+        admin = db.query(User).filter(User.username == settings.ADMIN_USERNAME).first()
+    return admin
+
+
+def resolve_user_from_token(token: Optional[str], db: Session) -> Optional[User]:
+    """Resolve a user from a raw token string (used by the WebSockets).
+
+    During the open-access testing phase (settings.OPEN_ACCESS), a missing or
+    invalid token maps to the shared demo admin instead of failing, so the
+    app works regardless of proxies, iframes or storage restrictions.
+    """
+    if token:
+        username = decode_token(token)
+        if username:
+            user = db.query(User).filter(User.username == username).first()
+            if user:
+                return user
+    if settings.OPEN_ACCESS:
+        return get_or_create_demo_admin(db)
+    return None
+
+
 def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    credentials_exception = HTTPException(
+    user = resolve_user_from_token(token, db)
+    if user:
+        return user
+
+    raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Authentification requise. Veuillez vous connecter.",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    if not token:
-        raise credentials_exception
 
+
+def get_optional_user(
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """Like get_current_user but returns None instead of raising 401.
+
+    Used for public endpoints (e.g. the catalog shown on the landing page)
+    that get richer when the visitor is authenticated.
+    """
+    if not token:
+        return None
     username = decode_token(token)
     if not username:
-        raise credentials_exception
-
-    user = db.query(User).filter(User.username == username).first()
-    if not user:
-        raise credentials_exception
-    return user
+        return None
+    return db.query(User).filter(User.username == username).first()
 
 
 @router.post("/register", response_model=UserResponse)
@@ -159,10 +195,12 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
 
 @router.post("/auto", response_model=AutoLoginResponse)
 def auto_login(db: Session = Depends(get_db)):
-    """Zero-login session for a private/internal instance.
+    """Open-access session for the testing phase (no login screen).
 
-    Ensures the bootstrap admin exists and issues a token for it, so the
-    frontend can land directly on the dashboard without a login page.
+    Ensures the shared demo admin exists (admin / admin by default) and
+    issues a token for it, so the frontend can land directly on the
+    dashboard. Set ASTAROTE_BOOTSTRAP_ADMIN=false and remove the frontend
+    auto-login call to return to the full SaaS auth flow.
     """
     admin = create_default_user_if_not_exists(db)
     if not admin:

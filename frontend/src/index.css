@@ -2,93 +2,127 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  html,
-  body,
-  #root {
-    height: 100%;
-  }
+/* ------------------------------------------------------------------ */
+/* Astatarote SaaS — design tokens (voir design-system/astatarote)    */
+/* ------------------------------------------------------------------ */
 
-  body {
-    background-color: #05070f;
-    color: #e2e8f0;
-    font-family: "Sora", system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-  }
+:root {
+  --bg: #0a0f1e;
+  --surface: #101731;
+  --surface-2: #161f3d;
+  --border: #232d4d;
+  --fg: #e6eaf4;
+  --muted: #8c97b4;
+  --primary: #6366f1;
+  --primary-hover: #818cf8;
+  --accent: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
 
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #1c2740 transparent;
-  }
+html {
+  color-scheme: dark;
+}
 
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #1c2740;
-    border-radius: 4px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #10b981;
+body {
+  @apply bg-bg text-fg font-sans antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2e3a63;
+}
+
+::selection {
+  background: rgba(99, 102, 241, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Component utilities                                               */
+/* ------------------------------------------------------------------ */
+
 @layer components {
-  .panel {
-    @apply bg-ink-panel/80 backdrop-blur-md border border-ink-line rounded-2xl;
+  .card {
+    @apply bg-surface border border-border rounded-2xl shadow-card;
   }
 
-  .panel-hover {
-    @apply transition-all duration-300 hover:border-asta-green/40 hover:shadow-glow;
-  }
-
-  .input-field {
-    @apply w-full bg-ink-deep/70 border border-ink-line rounded-xl px-4 py-2.5 text-sm text-gray-200
-      placeholder-gray-500 outline-none transition focus:border-asta-green/60 focus:ring-2
-      focus:ring-asta-green/10;
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-medium
+      cursor-pointer select-none transition-all duration-200
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60
+      disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-mono text-sm font-bold
-      text-black bg-gradient-to-r from-asta-green to-emerald-500 hover:shadow-glow
-      disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300;
+    @apply btn bg-primary text-white px-5 py-2.5 text-sm
+      hover:bg-primary-hover hover:shadow-[0_8px_24px_-8px_rgba(99,102,241,0.7)]
+      active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply btn bg-surface-2 text-fg border border-border px-5 py-2.5 text-sm
+      hover:border-muted/40 hover:bg-[#1b2547] active:scale-[0.98];
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-mono text-xs font-bold
-      text-gray-300 bg-ink-deep/50 border border-ink-line hover:border-asta-green/40 hover:text-white
-      transition-all duration-200;
+    @apply btn text-muted px-3 py-2 text-sm hover:text-fg hover:bg-surface-2;
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-mono text-xs font-bold
-      text-red-400 bg-red-500/10 border border-red-500/25 hover:bg-red-500/20 hover:border-red-500/50
-      transition-all duration-200;
+    @apply btn bg-danger/10 text-danger border border-danger/30 px-5 py-2.5 text-sm
+      hover:bg-danger/20 active:scale-[0.98];
+  }
+
+  .input {
+    @apply w-full bg-bg/60 border border-border rounded-xl px-4 py-2.5 text-sm text-fg
+      placeholder:text-muted/60 transition-colors duration-200
+      focus:outline-none focus:border-primary/70 focus:ring-2 focus:ring-primary/25;
+  }
+
+  .label {
+    @apply block text-[13px] font-medium text-fg mb-1.5;
   }
 
   .chip {
-    @apply inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest border;
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2/60
+      px-2.5 py-1 font-mono text-[11px] font-medium text-muted uppercase tracking-wide;
   }
 
   .section-title {
-    @apply flex items-center gap-2.5 font-mono text-sm font-black tracking-widest uppercase text-gray-300;
-  }
-
-  .terminal-scroll::-webkit-scrollbar-thumb {
-    background: #0e1a2c;
+    @apply text-[13px] font-semibold text-muted uppercase tracking-[0.08em];
   }
 }
 
-@layer utilities {
-  .text-glow {
-    text-shadow: 0 0 12px rgba(16, 185, 129, 0.55);
-  }
+/* ------------------------------------------------------------------ */
+/* xterm adjustments                                                  */
+/* ------------------------------------------------------------------ */
 
-  .clip-corner {
-    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
-  }
+.xterm .xterm-viewport {
+  background-color: transparent !important;
+}
+
+.terminal-shell .xterm-viewport::-webkit-scrollbar {
+  width: 8px;
 }

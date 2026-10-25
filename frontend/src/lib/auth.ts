@@ -1,5 +1,40 @@
+/**
+ * Session storage with a safe in-memory fallback.
+ *
+ * Some embedded/preview contexts (cross-origin iframes, strict browser
+ * settings) block localStorage access entirely. During the open-access
+ * testing phase the app must keep working: we fall back to per-page-load
+ * memory storage, and the server maps tokenless requests to the shared
+ * demo admin anyway (settings.OPEN_ACCESS).
+ */
 const TOKEN_KEY = "astarote_token";
 const USER_KEY = "astarote_user";
+
+const memory = new Map<string, string>();
+
+function storageGet(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return memory.get(key) ?? null;
+  }
+}
+
+function storageSet(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    memory.set(key, value);
+  }
+}
+
+function storageRemove(key: string): void {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    memory.delete(key);
+  }
+}
 
 export interface UserStats {
   total_time: number;
@@ -16,7 +51,6 @@ export interface UserPreferences {
   api_key: string;
   theme: string;
   font_size: number;
-  terminal_type: string;
 }
 
 export interface UserType {
@@ -29,29 +63,30 @@ export interface UserType {
 }
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return storageGet(TOKEN_KEY);
 }
 
 export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
+  storageSet(TOKEN_KEY, token);
 }
 
 export function setStoredUser(user: UserType): void {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  storageSet(USER_KEY, JSON.stringify(user));
 }
 
 export function getStoredUser(): UserType | null {
+  const raw = storageGet(USER_KEY);
+  if (!raw) return null;
   try {
-    const raw = localStorage.getItem(USER_KEY);
-    return raw ? (JSON.parse(raw) as UserType) : null;
+    return JSON.parse(raw) as UserType;
   } catch {
     return null;
   }
 }
 
 export function clearSession(): void {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  storageRemove(TOKEN_KEY);
+  storageRemove(USER_KEY);
 }
 
 export function isAuthenticated(): boolean {

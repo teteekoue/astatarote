@@ -1,124 +1,181 @@
 # Astatarote 🛡️
 
-**Astatarote** est une plateforme éducative gamifiée, open-source et adaptative, conçue pour l'apprentissage de l'administration système Linux et de la cybersécurité (offensive et défensive) de manière éthique.
+**Astatarote** est une plateforme **SaaS** d'apprentissage de Linux et de la cybersécurité :
+des parcours figés et vérifiés, un terminal Linux simulé par un moteur déterministe, et une
+assistante IA pédagogique — le tout dans le navigateur, sans aucune installation pour l'apprenant.
 
-Le cœur d'Astatarote réside dans son intégration profonde de l'Intelligence Artificielle (IA). L'IA Architecte génère dynamiquement des scénarios, des arborescences de fichiers, des permissions et des contrôles automatiques personnalisés selon le niveau et l'objectif d'apprentissage de l'utilisateur.
-
----
-
-## 🚀 Philosophie & Fonctionnalités Clés
-
-1. **Rien n'est Statique, Tout est Personnalisé** : L'utilisateur décrit ce qu'il souhaite apprendre (ex: "Sécuriser SSH", "Détecter des forces brutes", "Auditer Apache"). L'IA Architecte construit à la volée des exercices graduels et adaptés.
-2. **Terminal Interactif Virtuel** : Une émulation de shell Unix s'exécutant directement dans le navigateur (propulsée par xterm.js) permettant d'interagir avec un système de fichiers virtuel ou des conteneurs isolés.
-3. **Coéquipier IA Pédagogique** : Un chat en temps réel (via WebSockets) avec un assistant IA bienveillant qui explique les concepts, propose des indices progressifs et valide les travaux sans jamais donner la solution brute.
-4. **Système de Progression Gamifié** : Acquisition de points, grades d'avancement militaires (Novice, Apprenti, Administrateur, Expert, Maître) et déblocage de badges de spécialisation (Linux Ninja, Network Sentinel, Defender, White Hat).
+> **v3.0 — Le virage SaaS.** La génération de jeux par IA a été retirée (peu fiable, hallucinations) :
+> chaque parcours est désormais **rédigé à la main et figé**. L'IA n'intervient plus que comme
+> **assistante du joueur**. Le terminal n'exécute plus de vrai bash dans des sandboxes : il est
+> simulé par un **moteur Linux déterministe** — réaliste, instantané, et sans saturation de ressources.
 
 ---
 
-## 🏗️ Architecture Technique
+## 🚀 Ce qui a changé (v3.0)
 
-La plateforme repose sur une stack moderne, légère et sécurisée :
-
-- **Backend** : Python 3.10+ avec FastAPI, SQLAlchemy (modèles de données relationnels), et WebSockets en temps réel.
-- **Frontend** : React 18+, TypeScript, Tailwind CSS pour une interface sombre/cyber immersive, et xterm.js pour le terminal.
-- **Base de données** : SQLite (par défaut pour un déploiement zéro-config immédiat).
-- **Conteneurisation** : Docker & Docker Compose pour orchestres l'ensemble des services de développement.
-- **Support des APIs IA** : Intégration flexible pour NVIDIA, Groq, Fireworks, Cohere, et Together AI.
+| Avant (v2) | Maintenant (v3) |
+|---|---|
+| Jeux générés à la volée par LLM | **Catalogue de parcours figés**, rédigés et testés à la main |
+| Vrai bash via PTY + sandboxes sur le disque | **Moteur Linux déterministe** (VFS + 45 commandes + processus simulés) |
+| LLM Architecte + LLM tuteur | **Nemesis** : assistante IA uniquement pédagogique (avec mode hors-ligne intégré) |
+| Application locale mono-utilisateur (auto-login) | **SaaS multi-utilisateurs** : landing publique, inscription/connexion, catalogue |
+| Validation sur le système de fichiers réel | Validation sur **l'état de la machine virtuelle persisté** (anti-triche, hermétique) |
 
 ---
 
-## 📂 Structure du Projet
+## 🧠 Architecture
 
 ```text
-astarote/
+astatarote/
 ├── backend/
-│   ├── app/
-│   │   ├── main.py              # Point d'entrée FastAPI & configuration CORS/WebSockets
-│   │   ├── api/
-│   │   │   ├── routes/          # Routes API REST (jeux, niveaux, préférences)
-│   │   │   └── websockets/      # Sockets temps réel (terminal simulé, coéquipier chat)
-│   │   ├── core/
-│   │   │   ├── ai/              # Connecteurs LLM (NVIDIA, Groq, Together, fallback)
-│   │   │   ├── game/            # Moteur de validation des défis & calcul des points/grades
-│   │   │   ├── terminal/        # Simulateur de shell Unix et gestionnaire de sandbox
-│   │   │   └── database/        # Session et configuration SQLite/SQLAlchemy
-│   │   ├── models/              # Schémas de base de données relationnelle
-│   │   └── schemas/             # Modèles de données de validation Pydantic
-│   ├── requirements.txt         # Dépendances Python
-│   └── Dockerfile               # Dockerfile du serveur d'API
+│   └── app/
+│       ├── api/
+│       │   ├── routes/           # REST : auth, catalogue, parcours, validation
+│       │   └── websockets/       # WS : terminal (moteur déterministe) + chat IA
+│       ├── catalog/              # ★ PARCOURS FIGÉS (rédigés à la main)
+│       │   ├── __init__.py       #   registre du catalogue
+│       │   └── linux_essentials.py  #   parcours n°1 : 8 défis Linux
+│       ├── core/
+│       │   ├── ai/service.py     #   Nemesis : assistante pédagogique (+ fallback local)
+│       │   ├── game/engine.py    #   validation des défis (VFS, perms, processus, commandes)
+│       │   └── terminal/engine/  # ★ MOTEUR LINUX DÉTERMINISTE
+│       │       ├── vfs.py        #     système de fichiers virtuel POSIX-like
+│       │       ├── processes.py  #     table de processus simulée
+│       │       ├── commands.py   #     45+ commandes GNU (sorties réalistes)
+│       │       ├── shell.py      #     shell : parsing, pipes, redirections, hooks
+│       │       └── session.py    #     sessions + persistance (GameState)
+│       ├── models/ & schemas/    # SQLAlchemy + Pydantic
+│       └── tests/                # 41 tests : moteur, solveabilité de chaque défi, API SaaS
 ├── frontend/
-│   ├── src/
-│   │   ├── components/          # Vues & Panneaux (Dashboard, GameInterface, Chat, Terminal)
-│   │   ├── index.css            # Styles généraux, scrollbars et effets rétro/néon
-│   │   ├── App.tsx              # Routage et état d'affichage principal
-│   │   └── main.tsx             # Point d'entrée React / TypeScript
-│   ├── package.json             # Dépendances Node.js (xterm, lucide-react, vite)
-│   └── Dockerfile               # Dockerfile du serveur de développement Web
-├── docker-compose.yml           # Fichier d'orchestration multi-conteneurs
-└── README.md                    # Cette documentation
+│   └── src/
+│       ├── components/
+│       │   ├── Landing.tsx       # landing publique SaaS
+│       │   ├── Auth/             # connexion / inscription
+│       │   ├── Dashboard/        # mes parcours, catalogue
+│       │   ├── Game/             # atelier : mission + terminal + Nemesis
+│       │   └── ...
+│       └── lib/                  # client API, auth, WS
+├── Dockerfile                    # image de production (frontend buildé + API)
+├── docker-compose.yml            # déploiement SaaS (mono-conteneur)
+└── docker-compose.dev.yml        # environnement de développement
 ```
+
+### Le moteur Linux déterministe
+
+Inspiré des projets de simulation de terminal éducatifs étudiés lors de la conception
+([trybash/bash-emulator](https://github.com/trybash/bash-emulator),
+[terminal4dummies](https://github.com/jordanbailey00/terminal4dummies),
+[terminal_quest](https://github.com/brunozapico/terminal_quest),
+[jcubic/fake-linux-terminal](https://github.com/jcubic/fake-linux-terminal)),
+mais porté **côté serveur** pour que la validation soit infalsifiable :
+
+- **VFS POSIX-like** : permissions octales/symboliques, propriétaires, liens symboliques, jokers ;
+- **45+ commandes** aux sorties fidèles à GNU coreutils (`ls -l`, `chmod`, `ps aux`, `grep -r`…)
+  avec les messages d'erreur authentiques (`Permission denied`, `No such file or directory`…) ;
+- **Pipes, redirections, `;`, `&&`, `||`**, variables d'environnement, historique, autocomplétion Tab ;
+- **Processus simulés** (`ps aux`, `top`, `kill`) avec protections root ;
+- **Hooks de réponses par exercice** : chaque niveau peut scripter des sorties déterministes
+  pour des commandes spécifiques (`systemctl status backup_loop`, `ss -tulpn`…) ;
+- **Déterminisme total** : horloge figée, même scénario + mêmes commandes = même sortie ;
+- **Zéro processus système** : une session = un objet Python en mémoire, persisté en base
+  après chaque commande — des milliers d'apprenants simultanés sans VM ni conteneur.
+
+### Les parcours figés
+
+Chaque parcours est un module Python dans `backend/app/catalog/` : contexte narratif,
+consignes, fiche technique, indices, machine de départ (fichiers, processus) et critères de
+validation — tout est déclaré, testé (`test_linux_engine.py` rejoue la solution de chaque défi)
+et versionné. Ajouter un parcours = ajouter un module au registre.
+
+### Nemesis, l'assistante IA
+
+Nemesis aide le joueur en direct (WebSocket) : concepts, décryptage d'erreurs, indices
+progressifs — jamais la solution brute. Elle fonctionne **sans clé API** (mode hors-ligne à
+base de règles pédagogiques) ou avec le fournisseur LLM configuré par l'utilisateur
+(Groq, NVIDIA, Fireworks, Cohere, Together).
 
 ---
 
-## 🔧 Installation & Lancement
+## 🔧 Installation & lancement
 
-L'application est **prête à l'emploi dès le premier lancement** via Docker Compose. Si aucune clé d'API d'IA n'est configurée, l'application utilise automatiquement un simulateur de règles local ultra-réaliste pour générer des niveaux d'apprentissage complets.
+### 🧪 Phase actuelle : accès ouvert (test)
 
-### Prérequis
-- Docker et Docker Compose installés sur votre machine.
+Tant que la plateforme est en phase de test, **aucun compte n'est nécessaire** :
+- au chargement, l'app obtient automatiquement une session sur le compte démo
+  partagé **admin / admin** (`POST /api/auth/auto`) ;
+- en prime, `ASTAROTE_OPEN_ACCESS=true` fait en sorte que toute requête **sans
+  token valide** (proxy, iframe, stockage bloqué…) soit rattachée à ce compte
+  démo plutôt que rejetée — impossible de se retrouver enfermé dehors ;
+- l'écran de connexion, l'inscription et la gestion de compte sont retirés de
+  l'interface (les composants `Landing.tsx` / `AuthPage.tsx` / `Profile.tsx` /
+  `Settings.tsx` sont conservés pour la réactivation).
 
-### Étape 1 : Cloner le dépôt et configurer l'environnement
-Créez un fichier de variables d'environnement `.env` à la racine si vous souhaitez brancher vos services d'IA :
+Pour repasser en **SaaS multi-utilisateurs** :
+1. `ASTAROTE_BOOTSTRAP_ADMIN=false` et `ASTAROTE_OPEN_ACCESS=false` ;
+2. dans `frontend/src/App.tsx`, retirer l'appel à `/api/auth/auto` et remettre
+   les vues landing/auth + la navigation Profil/Paramètres.
 
-```env
-# .env (Optionnel)
-DATABASE_URL=sqlite://///home/user/astarote/astarote.db
-```
-
-### Étape 2 : Lancer avec Docker Compose
-Exécutez la commande suivante à la racine du projet pour construire et démarrer les conteneurs :
+### Déploiement SaaS (production)
 
 ```bash
-docker-compose up --build
+docker compose up -d --build
+# → http://localhost:8000
 ```
 
-Cette commande démarre :
-- Le **Frontend** sur [http://localhost:3000](http://localhost:3000)
-- Le **Backend FastAPI** sur [http://localhost:8000](http://localhost:8000)
+Variables clés (à surcharger en production) :
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `ASTAROTE_SECRET_KEY` | change-me | signature des JWT |
+| `DATABASE_URL` | sqlite:////data/astarote.db | base de données |
+| `ASTAROTE_BOOTSTRAP_ADMIN` | false | crée un admin au 1er démarrage (dev) |
+| `ASTAROTE_CORS_ORIGINS` | http://localhost:8000 | origines autorisées |
+
+### Développement local (sans Docker)
+
+```bash
+# Backend
+pip install -r backend/requirements.txt
+uvicorn backend.app.main:app --reload --port 8000
+
+# Frontend (Vite, proxy /api et /ws vers :8000)
+cd frontend && npm install && npm run dev
+```
+
+### Tests
+
+```bash
+python -m pytest backend/app/tests/ -q
+# 41 tests : moteur déterministe, solveabilité des 8 défis, flux SaaS complet (WS inclus)
+```
 
 ---
 
-## 🎮 Guide d'Utilisation
+## 🎮 Le premier parcours : *Linux Essentials*
 
-1. **Tableau de Bord** : Dès l'ouverture, visualisez vos statistiques globales, votre grade d'apprentissage et la liste de vos laboratoires actifs.
-2. **Créer un Jeu** : Allez dans "Créer mon Jeu", entrez un nom et décrivez vos objectifs d'apprentissage sous forme textuelle ou cliquez sur un bouton de préréglage recommandés.
-3. **Le Terminal Virtuel** : Tapez `ls`, `cd`, `cat`, `chmod`, `touch`, `mkdir`, `ps` pour interagir avec le système de fichiers virtuel. Utilisez des flux d'écriture standard comme `echo "texte" > fichier.txt` pour modifier les configurations système.
-4. **Dialogue Coéquipier** : Si vous êtes bloqué, cliquez sur les suggestions de raccourcis du chat (ex: "Donne-moi un indice") ou tapez directement vos questions pour obtenir une explication sur-mesure de la part de l'IA.
-5. **Validation** : Une fois les consignes exécutées, cliquez sur **"Soumettre la Solution"** en haut à droite. Si vos modifications système sont correctes, le défi est validé, les points sont crédités et le niveau suivant se déverrouille !
+8 défis narratifs chez **Meridian Corp.**, du premier `pwd` au premier incident de sécurité :
 
----
-
-## 🛡️ Sécurité & Isolation
-
-- **Simulation Locale** : Les commandes exécutées dans le terminal virtuels sont confinées dans une mémoire locale modélisée en base de données, évitant tout risque d'altération du système d'exploitation hôte.
-- **Liste Noire de Commandes** : Un filtre strict bloque les commandes jugées dangereuses (`rm -rf /`, `dd`, `mkfs`) pour enseigner de bonnes pratiques d'ingénierie et de sécurité.
-- **Support Docker** : Pour les cours avancés, les conteneurs d'exercices sont confinés de manière isolée sans privilèges (`cap_drop`), avec des limites drastiques de mémoire (128 Mo) et de CPU (0.5 max).
+1. **Premiers pas dans le terminal** — pwd, ls, whoami, cat
+2. **À la recherche du fichier de configuration** — find, cd, echo >
+3. **Le log qui en dit long** — grep, head, tail, pipes, wc
+4. **Grand nettoyage avant sauvegarde** — mkdir, mv, cp, rm, touch
+5. **Verrouiller les accès** — permissions, chmod, stat
+6. **Qui suis-je sur ce système ?** — id, /etc/passwd, sudo
+7. **Un processus s'est emballé** — ps aux, top, kill
+8. **Mission finale : premier incident** — find, kill, quarantaine, chmod 000, rapport
 
 ---
 
-## 🛠️ API & Documentation (Swagger)
+## 🗺️ Feuille de route
 
-Le backend FastAPI génère automatiquement une documentation interactive complète et conforme aux spécifications OpenAPI.
-Une fois le backend démarré, vous pouvez y accéder à l'adresse suivante :
-- **Swagger UI** : [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Redoc** : [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- [ ] Nouveaux parcours figés : *Réseau & diagnostic*, *Sécurisation SSH*, *Forensique légère*
+- [ ] Certificats de fin de parcours téléchargeables
+- [ ] Abonnements SaaS (Stripe) et espaces équipes
+- [ ] Éditeur de parcours (auteurs externes) avec pipeline de validation
 
 ---
 
-## 🤝 Contribution
+## 📜 Licence & éthique
 
-Les contributions éthiques et pédagogiques sont les bienvenues ! Pour proposer des améliorations :
-1. Créez un fork du projet.
-2. Implémentez vos modifications dans une branche dédiée.
-3. Rédigez des tests pour vos modifications critiques.
-4. Soumettez une Pull Request claire et détaillée.
+Astatarote est un projet éducatif **éthique** : offensive et défensive s'apprennent dans un
+environnement simulé isolé, sans cible réelle. Voir le code de conduite dans la documentation.

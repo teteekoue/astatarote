@@ -21,6 +21,8 @@ class Game(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    catalog_slug = Column(String, nullable=True, index=True)  # frozen course this run belongs to
+    catalog_version = Column(String, nullable=True)           # content version at enrollment
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     domain = Column(String, nullable=False)       # "linux", "network", "security"

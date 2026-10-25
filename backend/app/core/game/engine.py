@@ -1,19 +1,21 @@
 """
-Game validation engine.
+Game validation engine — deterministic edition.
 
-Instead of inspecting a simulated in-memory state, this engine validates each
-level against the REAL sandbox directory that the terminal operates on: file
-existence, permissions (octal), contents, removed files and running processes.
+Each level is validated against the persisted virtual machine state
+(GameState.terminal_state) produced by the deterministic Linux engine:
+file existence, permissions, contents, simulated processes and the
+commands the learner actually ran. No real filesystem is touched, which
+makes validation instant, hermetic and impossible to spoof from the client.
 """
 import logging
-import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
 from backend.app.models.models import Game, Level, GameState, User
-from backend.app.core.terminal.sandbox import SandboxManager
+from backend.app.core.terminal.engine import session as engine_sessions
+from backend.app.core.terminal.engine.shell import DeterministicShell
 
 logger = logging.getLogger("astarote.game")
 
@@ -31,6 +33,19 @@ BADGES = {
 }
 
 
+def _load_shell(game: Game, level: Level) -> Optional[DeterministicShell]:
+    """Rebuild the authoritative session state from the DB (never trusted from client)."""
+    state = (
+        level.game_states
+        and level.game_states[0]
+    )
+    saved = (state.terminal_state if state else None) or None
+    if saved and saved.get("_engine") == engine_sessions.STATE_VERSION:
+        return DeterministicShell.from_dict(saved, scenario=level.scenario)
+    # No session yet: the environment is still in its initial state.
+    return engine_sessions.get_session(game.id, level.id, level.scenario, saved)
+
+
 class GameEngine:
     @staticmethod
     def validate_level(db: Session, game_id: int, level_index: int) -> Dict[str, Any]:
@@ -44,97 +59,89 @@ class GameEngine:
         if not level:
             return {"success": False, "message": "Niveau introuvable.", "points_earned": 0}
 
-        scenario = level.scenario or {}
-        expected_state = scenario.get("expected_state", {}) or {}
+        shell = _load_shell(game, level)
+        if shell is None:
+            return {
+                "success": False,
+                "message": "Aucune session de terminal trouvée pour ce défi. Ouvrez le terminal puis validez à nouveau.",
+                "points_earned": 0,
+            }
 
-        # Materialise the sandbox on first access; NEVER recreate it here
-        # (the terminal may have modified files that validation inspects).
-        if not os.path.isdir(SandboxManager.sandbox_dir(game_id, level.id)):
-            SandboxManager.prepare(game_id, level.id, scenario)
-
+        expected_state = (level.scenario or {}).get("expected_state", {}) or {}
         failures: List[str] = []
         all_passed = True
 
-        # 1. File checks -------------------------------------------------
+        # 1. File checks ---------------------------------------------------
         for check in expected_state.get("files_checks", []) or []:
             path = check.get("path")
             if not path:
                 continue
-            abs_path = SandboxManager.resolve_sandbox_path(game_id, level.id, path)
-            if abs_path is None:
-                failures.append(f"Chemin invalide : '{path}'")
+            node = shell.vfs.get(path)
+            if node is None:
                 all_passed = False
+                failures.append(f"Élément manquant : '{path}'")
                 continue
 
-            if not os.path.lexists(abs_path):
+            expected_type = check.get("type")
+            if expected_type == "dir" and node.kind != "dir":
                 all_passed = False
-                failures.append(f"Fichier manquant : '{path}'")
+                failures.append(f"'{path}' devrait être un dossier.")
+                continue
+            if expected_type == "file" and node.kind == "dir":
+                all_passed = False
+                failures.append(f"'{path}' devrait être un fichier.")
                 continue
 
             expected_perms = check.get("perms")
             if expected_perms:
-                try:
-                    actual_perms = oct(os.stat(abs_path).st_mode & 0o777)[2:]
-                    if actual_perms != str(expected_perms):
-                        all_passed = False
-                        failures.append(
-                            f"Permissions incorrectes sur '{path}' : "
-                            f"attendu '{expected_perms}', trouvé '{actual_perms}'"
-                        )
-                except OSError:
+                actual_perms = oct(node.perms)[2:].zfill(3)
+                if actual_perms != str(expected_perms):
                     all_passed = False
-                    failures.append(f"Impossible de lire les permissions de '{path}'")
+                    failures.append(
+                        f"Permissions incorrectes sur '{path}' : attendu '{expected_perms}', trouvé '{actual_perms}'"
+                    )
 
             content_contains = check.get("content_contains")
             if content_contains:
-                try:
-                    with open(abs_path, "r", encoding="utf-8", errors="ignore") as fh:
-                        content = fh.read()
-                    if content_contains not in content:
-                        all_passed = False
-                        failures.append(
-                            f"Le contenu de '{path}' ne contient pas l'élément attendu."
-                        )
-                except OSError:
+                content = node.content if node.kind == "file" else ""
+                if str(content_contains).lower() not in content.lower():
                     all_passed = False
-                    failures.append(f"Impossible de lire '{path}'")
+                    failures.append(f"Le contenu de '{path}' ne contient pas l'élément attendu.")
 
             content_not_contains = check.get("content_not_contains")
             if content_not_contains:
-                try:
-                    with open(abs_path, "r", encoding="utf-8", errors="ignore") as fh:
-                        content = fh.read()
-                    if content_not_contains in content:
-                        all_passed = False
-                        failures.append(
-                            f"Le contenu de '{path}' ne doit pas contenir : "
-                            f"'{content_not_contains}'"
-                        )
-                except OSError:
-                    pass
+                content = node.content if node.kind == "file" else ""
+                if str(content_not_contains).lower() in content.lower():
+                    all_passed = False
+                    failures.append(f"Le contenu de '{path}' ne doit pas contenir : '{content_not_contains}'")
 
-        # 2. Process checks ----------------------------------------------
+        # 2. Deleted file checks -------------------------------------------
+        for check in expected_state.get("files_not_exists", []) or []:
+            path = check.get("path") if isinstance(check, dict) else check
+            if not path:
+                continue
+            if shell.vfs.exists(path):
+                all_passed = False
+                failures.append(f"'{path}' devrait avoir été déplacé ou supprimé.")
+
+        # 3. Process checks --------------------------------------------------
         proc_not_running = expected_state.get("process_not_running")
         if proc_not_running:
-            if SandboxManager.is_process_running(game_id, level.id, proc_not_running):
+            if shell.processes.find(name=proc_not_running) is not None:
                 all_passed = False
                 failures.append(f"Le processus '{proc_not_running}' est toujours actif !")
 
         proc_running = expected_state.get("process_running")
         if proc_running:
-            if not SandboxManager.is_process_running(game_id, level.id, proc_running):
+            if shell.processes.find(name=proc_running) is None:
                 all_passed = False
-                failures.append(f"Le processus '{proc_running}' devrait être actif.")
+                failures.append(f"Le processus '{proc_running}' devrait toujours être actif.")
 
-        # 3. Deleted file checks ------------------------------------------
-        file_not_exists = expected_state.get("file_not_exists")
-        if file_not_exists:
-            abs_path = SandboxManager.resolve_sandbox_path(game_id, level.id, file_not_exists)
-            if abs_path and os.path.lexists(abs_path):
+        # 4. Pedagogical command usage ---------------------------------------
+        for required in expected_state.get("commands_used", []) or []:
+            if not any(required in entry for entry in shell.history):
                 all_passed = False
-                failures.append(
-                    f"Le fichier '{file_not_exists}' n'a pas été supprimé."
-                )
+                failures.append(f"Commande attendue non utilisée : '{required}'")
 
         if not all_passed:
             level.attempts += 1
@@ -145,7 +152,7 @@ class GameEngine:
                 "points_earned": 0,
             }
 
-        # ---- Level passed! ---------------------------------------------
+        # ---- Level passed! ------------------------------------------------
         level.status = "completed"
         level.completed_at = datetime.utcnow()
         level.attempts += 1
@@ -154,7 +161,9 @@ class GameEngine:
         user = db.query(User).filter(User.id == game.user_id).first()
         badge_unlocked = None
         if user:
-            stats = user.stats or {}
+            # Copy first: re-assigning the same dict object is a no-op for
+            # SQLAlchemy's change detection on JSON columns.
+            stats = dict(user.stats or {})
             stats["points"] = stats.get("points", 0) + points_earned
             stats["levels_completed"] = stats.get("levels_completed", 0) + 1
 

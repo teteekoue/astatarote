@@ -16,8 +16,12 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Astatarote API",
-    description="Backend pour la plateforme d'apprentissage Linux et Cybersécurité Astatarote",
-    version="2.0.0",
+    description=(
+        "Backend SaaS de la plateforme d'apprentissage Linux et Cybersécurité "
+        "Astatarote — catalogue de parcours figés, moteur de terminal Linux "
+        "déterministe et assistante IA pédagogique."
+    ),
+    version="3.0.0",
 )
 
 # CORS — restricted to configured origins (credentials are never sent with wildcard)
@@ -40,7 +44,7 @@ app.include_router(chat_ws_router)
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "project": "Astatarote", "version": "2.0.0"}
+    return {"status": "ok", "project": "Astatarote", "version": "3.0.0"}
 
 
 # Mount built frontend assets (self-contained production distribution)

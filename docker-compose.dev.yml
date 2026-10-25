@@ -1,0 +1,37 @@
+# =============================================================================
+# Astatarote — environnement de développement (2 conteneurs)
+#   docker compose -f docker-compose.dev.yml up --build
+# Backend : FastAPI + reload sur :8000 · Frontend : Vite dev server sur :3000
+# =============================================================================
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - db_data:/data
+    environment:
+      - DATABASE_URL=sqlite:////data/astarote.db
+      - PYTHONUNBUFFERED=1
+      - ASTAROTE_BOOTSTRAP_ADMIN=true
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  db_data:
